@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en" data-repo="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rowan: a desktop database client for PostgreSQL, MySQL and SQLite</title>
+<meta name="description" content="Rowan is a desktop database client for PostgreSQL, MySQL and SQLite. Every connection opens read-only. AI agents connect over MCP, and their writes wait for your approval.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0d0e10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f1f0ee" media="(prefers-color-scheme: light)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Rowan">
+<meta property="og:description" content="A desktop database client for PostgreSQL, MySQL and SQLite. Every connection opens read-only. AI agents connect over MCP, and their writes wait for your approval.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/ibm-plex-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+<script src="main.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-download" viewBox="0 -960 960 960"><path d="M480-323.39 314.31-489.08l32.61-32.23 110.39 110V-780h45.38v368.69l110.39-110 32.61 32.23L480-323.39ZM180-180v-183h45.39v137.61h509.22V-363H780v183H180Z"/></symbol>
+  <symbol id="i-copy" viewBox="0 -960 960 960"><path d="M260.77-230.77V-860H770v629.23H260.77Zm45.38-45.39h418.46v-538.45H306.15v538.45ZM150-120v-616.92h45.39v571.53h451.53V-120H150Zm156.15-156.16v-538.45 538.45Z"/></symbol>
+  <symbol id="i-check" viewBox="0 -960 960 960"><path d="M379.15-258.31 168.62-468.85l32.61-32.23 177.92 177.93 379-379.39 32.62 32.62-411.62 411.61Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 -960 960 960"><path d="M533.85-220v-520H740v520H533.85ZM220-220v-520h206.54v520H220Zm359.23-45.39h115.38v-429.22H579.23v429.22Zm-313.84 0h115.76v-429.22H265.39v429.22Zm0-429.22v429.22-429.22Zm313.84 0v429.22-429.22Z"/></symbol>
+  <symbol id="i-play" viewBox="0 -960 960 960"><path d="M340-238.39v-487.68l383.07 243.84L340-238.39Zm45.39-243.84Zm0 161 253.99-161-253.99-161v322Z"/></symbol>
+  <symbol id="i-out" viewBox="0 -960 960 960"><path d="M241.62-258.69 210-290.31l413.92-414.31H241.31V-750h460v460h-45.39v-382.62l-414.3 413.93Z"/></symbol>
+  <symbol id="i-lock" viewBox="0 -960 960 960"><path d="M180-100v-515.54h127.31v-91.77q0-71.89 50.44-122.29Q408.19-880 480.13-880q71.95 0 122.25 50.4 50.31 50.4 50.31 122.29v91.77H780V-100H180Zm45.39-45.39h509.22v-424.76H225.39v424.76Zm302.57-164.14q19.81-19.53 19.81-47.01 0-26.54-19.98-47.77-19.97-21.23-47.96-21.23-27.98 0-47.79 21.23t-19.81 48.27q0 27.04 19.98 46.54 19.97 19.5 47.96 19.5 27.98 0 47.79-19.53ZM352.69-615.54h254.62v-91.77q0-53.04-37.09-90.17t-90.08-37.13q-52.99 0-90.22 37.13t-37.23 90.17v91.77Zm-127.3 470.15v-424.76 424.76Z"/></symbol>
+</svg>
+
+<header class="bar">
+  <a class="brand" href="#top"><img src="favicon.svg" width="20" height="20" alt=""><span>rowan</span></a>
+  <nav class="bar-nav" aria-label="Sections">
+    <ul>
+      <li><a href="#layouts">layouts</a></li>
+      <li><a href="#editor">editor</a></li>
+      <li><a href="#safety">safety</a></li>
+      <li><a href="#agents">agents</a></li>
+      <li><a href="#build">build</a></li>
+    </ul>
+  </nav>
+  <span class="bar-fill"></span>
+  <a class="bar-cell bar-version" id="bar-version" href="#top" hidden><span class="sq" aria-hidden="true"></span><span class="sr-only">Latest release </span><span id="bar-tag"></span></a>
+  <a class="bar-cell bar-repo" data-link="repo" href="#top" hidden>github<svg class="i" aria-hidden="true"><use href="#i-out"/></svg></a>
+</header>
+
+<main id="main">
+
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <img class="hero-mark" src="favicon.svg" width="56" height="56" alt="">
+        <h1 id="hero-title">Rowan</h1>
+        <p class="lede">A desktop database client for PostgreSQL, MySQL and SQLite.</p>
+        <p class="hero-sub">Every connection opens read-only at the database level. AI agents connect over MCP, and their writes wait for your approval.</p>
+        <div class="actions">
+          <a class="btn primary" id="download" href="#build"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg><span id="download-label">Build from source</span></a>
+          <a class="btn" id="download-secondary" href="#build" hidden>Build from source</a>
+        </div>
+        <p class="dl-meta" id="download-meta" aria-live="polite">Rowan runs on Linux, macOS and Windows.</p>
+        <p class="dl-alt" id="download-alt" hidden></p>
+      </div>
+
+      <dl class="facts">
+        <div><dt>databases</dt><dd>PostgreSQL, MySQL, SQLite</dd></div>
+        <div><dt>agents</dt><dd>MCP over HTTP and stdio</dd></div>
+        <div><dt>built with</dt><dd>Go and Wails</dd></div>
+      </dl>
+
+      <figure class="promo">
+        <div class="promo-frame" id="promo-frame">
+          <video id="promo" autoplay muted loop playsinline preload="metadata" poster="media/rowan-promo.jpg" src="media/rowan-promo.mp4" aria-describedby="promo-desc"></video>
+          <button class="promo-toggle" id="promo-toggle" type="button" hidden>
+            <svg class="i i-pause" aria-hidden="true"><use href="#i-pause"/></svg>
+            <svg class="i i-play" aria-hidden="true"><use href="#i-play"/></svg>
+            <span class="sr-only" id="promo-toggle-label">Pause the video</span>
+          </button>
+        </div>
+        <figcaption class="sr-only" id="promo-desc">
+          A video of Rowan with no sound. The captions say: Every connection opens read-only. Completion for tables after FROM and JOIN. Columns for each alias in the statement. Keywords in the case that you type. Ctrl Enter runs the query. A write does not run until you unlock the connection. Agents connect over MCP. Their writes wait for you. You see the reason, the SQL and the rows that change. Rowan runs the write only after you approve it. Two layouts: a search surface or a full workspace.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section" id="layouts" aria-labelledby="layouts-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="layouts-title">Work in the layout that fits the task</h2>
+        <div class="head-text">
+          <p>Rowan has two layouts. Both use the same connections, safety model and dialogs.</p>
+          <p>To switch the layout, click the layout button in the title bar. You can also press <kbd>Ctrl</kbd>+<kbd>K</kbd> and choose the switch command. On macOS, press <kbd>⌘</kbd><kbd>K</kbd>.</p>
+        </div>
+      </div>
+
+      <div class="tabs" id="layout-tabs">
+        <div class="tablist" role="tablist" aria-label="Layouts">
+          <button class="tab" type="button" role="tab" id="tab-workspace" aria-controls="panel-workspace" aria-selected="true"><span class="sq" aria-hidden="true"></span>workspace</button>
+          <button class="tab" type="button" role="tab" id="tab-command" aria-controls="panel-command" aria-selected="false" tabindex="-1"><span class="sq" aria-hidden="true"></span>command</button>
+        </div>
+
+        <div class="panel" id="panel-workspace">
+          <figure class="shot">
+            <div class="frame">
+              <img src="images/workspace-dark.png" width="2880" height="1800" loading="lazy" decoding="async" alt="The workspace layout in the dark theme. Connection tabs run across the top. The SQL editor sits above the result grid. The row inspector and the agent feed fill the right column.">
+            </div>
+          </figure>
+          <div class="panel-text">
+            <h3>Workspace</h3>
+            <p>Connections are tabs at the top. The editor and the grid stack in the center. A row inspector and a live agent feed sit on the right.</p>
+            <p>The inspector shows the selected row and the tables that reference it. To open the row that a foreign key points to, click its value.</p>
+            <p>Corners are square and the font is mono throughout.</p>
+          </div>
+          <div class="panel-table">
+            <table class="spec">
+              <caption>Parts of the workspace layout</caption>
+              <thead><tr><th scope="col">Area</th><th scope="col">Contents</th></tr></thead>
+              <tbody>
+                <tr><td>Title bar</td><td>Connection tabs, search, the layout and theme buttons, the lock state and the MCP status</td></tr>
+                <tr><td>Left</td><td>A rail for tables, the MCP server and the activity log, then the table list with a filter</td></tr>
+                <tr><td>Center</td><td>The SQL editor above the result grid</td></tr>
+                <tr><td>Right</td><td>The row inspector and the live agent feed</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-command">
+          <figure class="shot">
+            <div class="frame">
+              <img src="images/command-light.png" width="2880" height="1800" loading="lazy" decoding="async" alt="The command layout in the light theme. The search orders refunded lists the matching tables and shows a live preview of the refunded orders.">
+            </div>
+          </figure>
+          <div class="panel-text">
+            <h3>Command</h3>
+            <p>There is no permanent sidebar. You open everything from one search surface with a live preview. This layout suits people who visit a database occasionally.</p>
+            <p>The first word picks a table. The other words become filters. The preview runs while you type.</p>
+          </div>
+          <div class="panel-table">
+            <table class="spec">
+              <caption>Search input and the filter that Rowan writes</caption>
+              <thead><tr><th scope="col">Input</th><th scope="col">Filter</th></tr></thead>
+              <tbody>
+                <tr><td><code>orders refunded</code></td><td><code>status = 'refunded'</code><span class="note"><code>refunded</code> is a sampled value of <code>status</code>.</span></td></tr>
+                <tr><td><code>orders 10442</code></td><td><code>id = 10442</code><span class="note">A number filters the primary key.</span></td></tr>
+                <tr><td><code>orders status:shipped</code></td><td><code>status = 'shipped'</code></td></tr>
+                <tr><td><code>orders total_cents&gt;5000</code></td><td><code>total_cents &gt; 5000</code></td></tr>
+                <tr><td><code>customers email~acme</code></td><td><code>email</code> contains <code>acme</code></td></tr>
+                <tr><td><code>orders shipped_at:null</code></td><td><code>shipped_at IS NULL</code></td></tr>
+              </tbody>
+            </table>
+            <ul class="keys">
+              <li><kbd>Tab</kbd><span>Write the filters in <code>column:value</code> form, so you can edit them.</span></li>
+              <li><kbd>Enter</kbd><span>Open the table.</span></li>
+              <li><span class="kbds"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span><span>Open the query in the editor.</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="editor" aria-labelledby="editor-title">
+    <div class="wrap split">
+      <div class="split-text">
+        <h2 id="editor-title">Write SQL with completion that reads your schema</h2>
+        <p>The editor completes tables, columns, keywords and functions while you type. The list depends on the position of the caret in the statement.</p>
+        <table class="spec">
+          <caption>What the completion list shows</caption>
+          <thead><tr><th scope="col">Caret position</th><th scope="col">The list shows</th></tr></thead>
+          <tbody>
+            <tr><td>After <code>FROM</code>, <code>JOIN</code>, <code>UPDATE</code> or <code>INTO</code></td><td>Tables and views</td></tr>
+            <tr><td>After <code>SELECT</code>, <code>WHERE</code>, <code>ON</code>, <code>SET</code> or <code>ORDER BY</code></td><td>The columns of the tables in the statement</td></tr>
+            <tr><td>After <code>alias.</code> or <code>table.</code></td><td>The columns of that table</td></tr>
+            <tr><td>After <code>INSERT INTO orders (</code></td><td>Only the columns of <code>orders</code></td></tr>
+          </tbody>
+        </table>
+        <p>When two tables in the statement have a column with the same name, Rowan inserts the column with its alias, such as <code>o.id</code>. Keywords follow the case that you type. A function inserts with its parentheses.</p>
+        <ul class="keys">
+          <li><span class="kbds"><kbd>Tab</kbd> or <kbd>Enter</kbd></span><span>Insert the selected item.</span></li>
+          <li><span class="kbds"><kbd>Ctrl</kbd>+<kbd>Space</kbd></span><span>Open the list at the caret.</span></li>
+          <li><kbd>Esc</kbd><span>Close the list.</span></li>
+        </ul>
+        <p class="small">When the editor gets focus, Rowan loads the columns of all tables in one catalog query. If the schema has more than 20,000 columns, Rowan loads the columns of a table when a statement names it.</p>
+      </div>
+      <figure class="shot split-media">
+        <div class="frame zoom" style="--zoom: 2; --ox: 36%; --oy: 8%">
+          <img src="images/completion.png" width="2880" height="1800" loading="lazy" decoding="async" alt="The SQL editor with the completion list open after c. in a WHERE clause. The list shows the columns of the customers table, which has the alias c.">
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section band" id="safety" aria-labelledby="safety-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="safety-title">Every connection opens read-only</h2>
+        <div class="head-text">
+          <p>Rowan sets read-only mode in the database session, not only in the UI. A write fails in the database even if a check in Rowan misses it.</p>
+          <p>To write, unlock the connection for a fixed time. Rowan then relocks it.</p>
+        </div>
+      </div>
+
+      <div class="verdicts">
+        <table class="verdict-table" role="table">
+          <caption id="verdicts-caption">Rowan classifies each statement before it runs</caption>
+          <thead role="rowgroup">
+            <tr role="row"><th scope="col" role="columnheader">Statement</th><th scope="col" role="columnheader">Class</th><th scope="col" role="columnheader">Locked connection</th><th scope="col" role="columnheader">Unlocked connection</th></tr>
+          </thead>
+          <tbody role="rowgroup">
+            <tr role="row">
+              <td role="cell" class="sql"><code><span class="kw">SELECT</span> * <span class="kw">FROM</span> orders <span class="kw">WHERE</span> status = <span class="str">'refunded'</span></code></td>
+              <td role="cell" data-label="Class"><span class="chip ok">read</span></td>
+              <td role="cell" data-label="Locked">Runs</td>
+              <td role="cell" data-label="Unlocked">Runs</td>
+            </tr>
+            <tr role="row">
+              <td role="cell" class="sql"><code><span class="kw">UPDATE</span> orders <span class="kw">SET</span> status = <span class="str">'shipped'</span> <span class="kw">WHERE</span> id = <span class="num">10442</span></code></td>
+              <td role="cell" data-label="Class"><span class="chip warn">write</span></td>
+              <td role="cell" data-label="Locked"><span class="blocked"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Blocked</span></td>
+              <td role="cell" data-label="Unlocked">Runs</td>
+            </tr>
+            <tr role="row">
+              <td role="cell" class="sql"><code><span class="kw">UPDATE</span> orders <span class="kw">SET</span> status = <span class="str">'shipped'</span></code></td>
+              <td role="cell" data-label="Class"><span class="chip danger">destructive</span></td>
+              <td role="cell" data-label="Locked"><span class="blocked"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Blocked</span></td>
+              <td role="cell" data-label="Unlocked">Asks for confirmation. It changes every row in the table.</td>
+            </tr>
+            <tr role="row">
+              <td role="cell" class="sql"><code><span class="kw">DROP TABLE</span> invoices</code></td>
+              <td role="cell" data-label="Class"><span class="chip danger">destructive</span></td>
+              <td role="cell" data-label="Locked"><span class="blocked"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Blocked</span></td>
+              <td role="cell" data-label="Unlocked">Asks for confirmation. A drop cannot be undone.</td>
+            </tr>
+            <tr role="row">
+              <td role="cell" class="sql"><code><span class="kw">SET</span> default_transaction_read_only = <span class="kw">off</span></code></td>
+              <td role="cell" data-label="Class"><span class="chip warn">write</span></td>
+              <td role="cell" data-label="Locked"><span class="blocked"><svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>Blocked</span></td>
+              <td role="cell" data-label="Unlocked">Runs. Rowan then closes the session.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="split split-flip">
+        <figure class="shot split-media">
+          <div class="frame zoom" style="--zoom: 2; --ox: 28%; --oy: 8%">
+            <img src="images/locked.png" width="2880" height="1800" loading="lazy" decoding="async" alt="Rowan blocks an UPDATE on the read-only acme-prod connection. The message says to unlock writes to run it, with an Unlock writes button.">
+          </div>
+        </figure>
+        <dl class="rules">
+          <div>
+            <dt>Read-only at the database level</dt>
+            <dd>The read pool sets <code>default_transaction_read_only</code> on PostgreSQL, <code>transaction_read_only</code> on MySQL and <code>query_only</code> on SQLite.</dd>
+          </div>
+          <div>
+            <dt>Writes need an unlock</dt>
+            <dd>A write on a locked connection does not reach the database. Unlock for 5, 15, 30 or 60 minutes, or until relaunch. Rowan then relocks the connection and closes its write pool.</dd>
+          </div>
+          <div>
+            <dt>Production connections ask for the name</dt>
+            <dd>To unlock a production connection, type the connection name.</dd>
+          </div>
+          <div>
+            <dt>Destructive statements ask for confirmation</dt>
+            <dd>This applies to <code>DROP</code>, <code>TRUNCATE</code>, and <code>DELETE</code> or <code>UPDATE</code> without <code>WHERE</code>.</dd>
+          </div>
+          <div>
+            <dt>Statements that lift read-only mode count as writes</dt>
+            <dd>Examples are <code>SET default_transaction_read_only = off</code>, <code>BEGIN READ WRITE</code> and <code>PRAGMA query_only = 0</code>.</dd>
+          </div>
+          <div>
+            <dt>Session state does not leak</dt>
+            <dd>When a script runs <code>SET</code>, <code>USE</code> or its own <code>BEGIN</code>, Rowan closes that connection after the script. The connection does not go back to the pool.</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="agents" aria-labelledby="agents-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="agents-title">Agents query your data. You approve their writes.</h2>
+        <div class="head-text">
+          <p>AI agents connect to Rowan over MCP. You choose the connections and the tables that agents can see.</p>
+          <p>With approvals on, a write from an agent waits in the approval queue until you approve or deny it.</p>
+        </div>
+      </div>
+
+      <figure class="shot shot-wide">
+        <div class="frame">
+          <img src="images/approval.png" width="2880" height="1800" loading="lazy" decoding="async" alt="The approval queue with 3 agent writes. Each entry shows the agent, the reason, the SQL statement and the rows that change, with Deny and Approve buttons.">
+        </div>
+        <figcaption>
+          <dl class="notes">
+            <div><dt>reason</dt><dd>The reason that the agent gave for the write.</dd></div>
+            <div><dt>sql</dt><dd>The statement that the agent wants to run.</dd></div>
+            <div><dt>impact</dt><dd>The number of rows that change, counted with the read pool. For updates and inserts, the old and new values. Rowan never runs a write to compute this preview.</dd></div>
+          </dl>
+        </figcaption>
+      </figure>
+
+      <div class="split">
+        <div class="split-text">
+          <h3>Connect an agent</h3>
+          <p>Rowan serves MCP over Streamable HTTP on <code>127.0.0.1:7421/mcp</code>. Every request needs the bearer token in <code>~/.config/rowan/mcp-token</code>.</p>
+          <p>Rowan refuses requests that carry an <code>Origin</code> header. This blocks web pages and DNS rebinding.</p>
+          <p>For a client that speaks only stdio, add the bridge. The bridge forwards each call to the running app.</p>
+          <div class="code">
+            <div class="code-head"><span>shell</span><button class="copy" type="button" data-copy="mcp-cmd" hidden><svg class="i i-copy" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i i-check" aria-hidden="true"><use href="#i-check"/></svg><span class="copy-label">copy</span><span class="sr-only"> the MCP command</span></button></div>
+            <pre id="mcp-cmd"><code><span class="line"><span class="prompt" aria-hidden="true">$ </span><span class="cmd">claude mcp add rowan -- /path/to/rowan mcp --stdio</span></span></code></pre>
+          </div>
+          <p>Replace <code>/path/to/rowan</code> with the path to the Rowan binary. The MCP server view in Rowan shows a snippet to copy for Claude Desktop, Claude Code, Cursor and plain HTTP.</p>
+        </div>
+        <figure class="shot split-media">
+          <div class="frame">
+            <img src="images/mcp.png" width="2880" height="1800" loading="lazy" decoding="async" alt="The MCP server view. It lists the connected clients, a configuration snippet for each client, the agent policy for each connection and the tools that agents can call.">
+          </div>
+        </figure>
+      </div>
+
+      <div class="split split-even">
+        <div>
+          <h3>Tools</h3>
+          <table class="spec">
+            <caption class="sr-only">MCP tools and what they do</caption>
+            <thead><tr><th scope="col">Tool</th><th scope="col">What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>list_connections</code></td><td>Lists the connections that you shared with agents.</td></tr>
+              <tr><td><code>list_tables</code></td><td>Lists the tables in the allowlist, with row counts.</td></tr>
+              <tr><td><code>describe_table</code></td><td>Returns columns, keys, indexes and references.</td></tr>
+              <tr><td><code>query</code></td><td>Runs one read-only statement. Results stop at the row limit.</td></tr>
+              <tr><td><code>explain</code></td><td>Returns the plan. Rowan refuses <code>ANALYZE</code>.</td></tr>
+              <tr><td><code>execute</code></td><td>Runs one write on a read-write connection. With approvals on, the call waits for you.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Policy for each connection</h3>
+          <ul class="policy">
+            <li><span>Shared or hidden</span></li>
+            <li><span>Read-only or read-write</span></li>
+            <li><span>Approve writes</span><span class="note">Always on for production connections.</span></li>
+            <li><span>Row limit</span></li>
+            <li><span>Table allowlist</span></li>
+          </ul>
+          <p class="small">Rowan blocks a statement that names a table outside the allowlist. Rowan does not check views that read hidden tables. To protect that data, use database grants.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section band" id="build" aria-labelledby="build-title">
+    <div class="wrap split">
+      <div class="split-text">
+        <h2 id="build-title">Build from source</h2>
+        <p>You need Go 1.27, Node 20 or later and the Wails v2 CLI. On Linux, you also need GTK 3 and WebKitGTK 4.1.</p>
+        <ol class="steps">
+          <li><span>Clone <a data-link="repo" href="#build">the repository</a>.</span></li>
+          <li><span>In the repository root, build the app.</span></li>
+          <li><span>Start the app.</span></li>
+        </ol>
+        <p>On macOS and Windows, leave out <code>-tags webkit2_41</code>. For live reload during development, run <code>wails dev -tags webkit2_41</code>.</p>
+        <p>On first launch, Rowan writes <code>~/.config/rowan/config.toml</code> and a sample SQLite database. The sample has customers, products, orders, order items and invoices.</p>
+        <p class="release-note" data-needs-repo hidden>To skip the build, download a binary from the <a data-link="releases" href="#build">releases page</a>.</p>
+      </div>
+      <div class="split-media">
+        <div class="code code-lg">
+          <div class="code-head"><span>shell</span><button class="copy" type="button" data-copy="build-cmd" hidden><svg class="i i-copy" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i i-check" aria-hidden="true"><use href="#i-check"/></svg><span class="copy-label">copy</span><span class="sr-only"> the build commands</span></button></div>
+          <pre id="build-cmd"><code><span class="line" id="clone-line" hidden><span class="prompt" aria-hidden="true">$ </span><span class="cmd" id="clone-cmd"></span></span><span class="line" id="cd-line" hidden><span class="prompt" aria-hidden="true">$ </span><span class="cmd" id="cd-cmd"></span></span><span class="line"><span class="prompt" aria-hidden="true">$ </span><span class="cmd">wails build -tags webkit2_41</span></span><span class="line"><span class="prompt" aria-hidden="true">$ </span><span class="cmd">./build/bin/rowan</span></span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-grid">
+    <div class="foot-id">
+      <img src="favicon.svg" width="32" height="32" alt="">
+      <div>
+        <p class="foot-name">Rowan</p>
+        <p class="foot-desc">A desktop database client for PostgreSQL, MySQL and SQLite. Built with Go and Wails.</p>
+      </div>
+    </div>
+    <nav class="foot-nav" aria-label="Project" data-needs-repo hidden>
+      <ul>
+        <li><a data-link="repo" href="#top">Repository</a></li>
+        <li><a data-link="docs" href="#top">Documentation</a></li>
+        <li><a data-link="releases" href="#top">Releases</a></li>
+        <li><a data-link="changelog" href="#top">Changelog</a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
+</footer>
+</body>
+</html>

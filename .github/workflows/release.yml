@@ -1,0 +1,320 @@
+# Builds Rowan for Linux, macOS and Windows when a tag vX.Y.Z is pushed, and
+# publishes a GitHub release. docs/releasing.md describes the full flow.
+#
+# macOS signing and notarization are optional. They run only when these
+# repository secrets exist:
+#   MACOS_CERTIFICATE           base64 of a "Developer ID Application" .p12 file
+#   MACOS_CERTIFICATE_PASSWORD  the password of the .p12 file
+#   APPLE_ID                    the Apple ID that submits for notarization
+#   APPLE_APP_PASSWORD          an app-specific password for that Apple ID
+#   APPLE_TEAM_ID               the 10-character Apple developer team ID
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test
+    uses: ./.github/workflows/ci.yml
+
+  notes:
+    name: Release notes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check the tag and read the notes from CHANGELOG.md
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          semver='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$TAG" =~ $semver ]]; then
+            echo "::error::The tag $TAG does not match vX.Y.Z or vX.Y.Z-prerelease."
+            exit 1
+          fi
+          # Print the section "## [X.Y.Z] - date" up to the next "## "
+          # heading or the link references.
+          awk -v v="${TAG#v}" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && (/^## / || /^\[[^]]+\]: /) { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for ${TAG#v}. Run scripts/release.sh to make the release commit."
+            exit 1
+          fi
+          cat notes.md
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: [test, notes]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        include:
+          - target: linux-amd64
+            os: ubuntu-24.04
+            wails-flags: -tags webkit2_41
+          - target: linux-arm64
+            os: ubuntu-24.04-arm
+            wails-flags: -tags webkit2_41
+          - target: macos-universal
+            os: macos-latest
+            wails-flags: -platform darwin/universal
+          - target: windows-amd64
+            os: windows-latest
+            wails-flags: -nsis
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ github.ref_name }}
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The release builds do not use caches. A poisoned cache then cannot
+      # reach a release artifact.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install the Linux build packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      # wails build only prints a warning when makensis is missing, so the
+      # package step checks that the installer exists.
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        run: |
+          if ! command -v makensis >/dev/null 2>&1; then
+            choco install nsis --yes --no-progress
+            echo 'C:\Program Files (x86)\NSIS' >> "$GITHUB_PATH"
+          fi
+
+      - name: Install the Wails CLI
+        run: |
+          wails_version="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)"
+          go install "github.com/wailsapp/wails/v2/cmd/wails@${wails_version}"
+          wails version
+
+      # Windows and macOS version fields accept numbers only, so a
+      # prerelease tag v1.3.0-rc.1 gives the product version 1.3.0.
+      - name: Set the product version in wails.json
+        run: |
+          core="${TAG#v}"
+          core="${core%%-*}"
+          node -e '
+          const fs = require("fs")
+          const file = "wails.json"
+          const project = JSON.parse(fs.readFileSync(file, "utf8"))
+          project.info = { ...project.info, productVersion: process.argv[1] }
+          fs.writeFileSync(file, JSON.stringify(project, null, 2) + "\n")
+          ' "$core"
+          cat wails.json
+
+      - name: Install the frontend packages
+        working-directory: frontend
+        run: npm ci
+
+      - name: wails build
+        run: wails build ${{ matrix.wails-flags }} -trimpath -m -nosyncgomod -ldflags "-X main.version=${TAG}"
+
+      - name: Check the version output
+        run: |
+          case "$RUNNER_OS" in
+            macOS) bin=build/bin/rowan.app/Contents/MacOS/rowan ;;
+            Windows) bin=build/bin/rowan.exe ;;
+            *) bin=build/bin/rowan ;;
+          esac
+          out="$("$bin" --version)"
+          echo "$out"
+          test "$out" = "rowan ${TAG}"
+
+      - name: Package for Linux
+        if: runner.os == 'Linux'
+        run: |
+          name="rowan-${TAG}-${TARGET}"
+          mkdir -p "stage/${name}" dist
+          cp build/bin/rowan README.md "stage/${name}/"
+          cp build/appicon.png "stage/${name}/rowan.png"
+          cat > "stage/${name}/rowan.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Rowan
+          Comment=Database client for PostgreSQL, MySQL and SQLite
+          Exec=rowan
+          Icon=rowan
+          Terminal=false
+          Categories=Development;Database;
+          StartupWMClass=rowan
+          EOF
+          tar -C stage --owner=0 --group=0 -czf "dist/${name}.tar.gz" "${name}"
+          tar -tzvf "dist/${name}.tar.gz"
+
+      - name: Check for the macOS signing secrets
+        id: signing
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          sign=false
+          notarize=false
+          if [[ -n "$MACOS_CERTIFICATE" && -n "$MACOS_CERTIFICATE_PASSWORD" ]]; then
+            sign=true
+            if [[ -n "$APPLE_ID" && -n "$APPLE_APP_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+              notarize=true
+            fi
+          fi
+          echo "sign=${sign}" >> "$GITHUB_OUTPUT"
+          echo "notarize=${notarize}" >> "$GITHUB_OUTPUT"
+          echo "Sign: ${sign}. Notarize: ${notarize}."
+
+      - name: Import the signing certificate
+        if: steps.signing.outputs.sign == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/rowan-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 24)"
+          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychain -d user -s "$keychain"
+          identity="$(security find-identity -v -p codesigning "$keychain" | awk '/Developer ID Application/ { print $2; exit }')"
+          if [[ -z "$identity" ]]; then
+            echo "::error::MACOS_CERTIFICATE has no Developer ID Application identity."
+            exit 1
+          fi
+          echo "MACOS_SIGNING_IDENTITY=${identity}" >> "$GITHUB_ENV"
+          echo "MACOS_KEYCHAIN=${keychain}" >> "$GITHUB_ENV"
+
+      - name: Sign the app
+        if: steps.signing.outputs.sign == 'true'
+        run: |
+          codesign --force --options runtime --timestamp --keychain "$MACOS_KEYCHAIN" --sign "$MACOS_SIGNING_IDENTITY" build/bin/rowan.app
+          codesign --verify --strict --verbose=2 build/bin/rowan.app
+
+      # Without a certificate, an ad hoc signature keeps the bundle valid.
+      # macOS then reports an unknown developer, not a damaged app.
+      - name: Sign the app ad hoc
+        if: runner.os == 'macOS' && steps.signing.outputs.sign != 'true'
+        run: codesign --force --deep --sign - build/bin/rowan.app
+
+      - name: Notarize the app
+        if: steps.signing.outputs.notarize == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent build/bin/rowan.app "$RUNNER_TEMP/rowan-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/rowan-notarize.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple build/bin/rowan.app
+          xcrun stapler validate build/bin/rowan.app
+
+      - name: Delete the signing keychain
+        if: always() && steps.signing.outputs.sign == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/rowan-signing.keychain-db" || true
+
+      - name: Package for macOS
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent build/bin/rowan.app "dist/rowan-${TAG}-${TARGET}.zip"
+
+      - name: Package for Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "rowan-${env:TAG}-${env:TARGET}"
+          New-Item -ItemType Directory -Force -Path dist, "stage/${name}" | Out-Null
+          Copy-Item build/bin/rowan-amd64-installer.exe "dist/${name}-installer.exe"
+          Copy-Item build/bin/rowan.exe, README.md "stage/${name}"
+          Compress-Archive -Path "stage/${name}" -DestinationPath "dist/${name}.zip"
+          Get-ChildItem dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rowan-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: GitHub release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: rowan-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: notes
+
+      - name: Write SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum -- rowan-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          args=(--title "Rowan ${TAG}" --notes-file notes/notes.md --verify-tag)
+          if [[ "$TAG" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$TAG" "${args[@]}" dist/*

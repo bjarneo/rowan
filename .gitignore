@@ -1,0 +1,7 @@
+build/bin/
+frontend/node_modules/
+frontend/dist/
+.cdp/
+
+# Failed promo renders
+site/media/*-failure.png

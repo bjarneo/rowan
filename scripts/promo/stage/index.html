@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rowan promo stage</title>
+<style>
+  @font-face { font-family: 'Geist'; src: url(geist-latin-wght-normal.woff2) format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: 'Plex'; src: url(plex-400.woff2) format('woff2'); font-weight: 400; }
+  @font-face { font-family: 'Plex'; src: url(plex-500.woff2) format('woff2'); font-weight: 500; }
+  :root { --fg: oklch(0.96 0.004 85); --muted: oklch(0.72 0.006 265); --acc: oklch(0.72 0.13 290); }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: oklch(0.155 0.004 265); }
+  body { font-family: 'Geist', system-ui, sans-serif; color: var(--fg); -webkit-font-smoothing: antialiased; }
+  #bg { position: absolute; inset: 0; background:
+    radial-gradient(1400px 800px at 50% 118%, oklch(0.42 0.14 290 / 0.42), transparent 70%),
+    radial-gradient(900px 600px at 8% -10%, oklch(0.4 0.08 235 / 0.22), transparent 70%); }
+  #grid { position: absolute; inset: 0; opacity: 0.5;
+    background-image: linear-gradient(oklch(1 0 0 / 0.035) 1px, transparent 1px), linear-gradient(90deg, oklch(1 0 0 / 0.035) 1px, transparent 1px);
+    background-size: 48px 48px; mask-image: radial-gradient(1100px 700px at 50% 45%, #000, transparent); }
+  #world { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; }
+  #win { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; background: #151619;
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.09), 0 30px 80px oklch(0 0 0 / 0.55), 0 8px 24px oklch(0 0 0 / 0.35); }
+  #win iframe { width: 1440px; height: 900px; border: 0; display: block; }
+  #cursor { position: absolute; left: 0; top: 0; width: 28px; height: 28px; transform-origin: 0 0; pointer-events: none; filter: drop-shadow(0 2px 4px oklch(0 0 0 / 0.45)); }
+  #ring { position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--acc); opacity: 0; }
+  #scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; background: linear-gradient(transparent, oklch(0.12 0.004 265 / 0.92) 62%); pointer-events: none; }
+  #cap { position: absolute; left: 0; right: 0; bottom: 74px; text-align: center; font-size: 54px; font-weight: 560; letter-spacing: -0.015em; line-height: 1.1; white-space: nowrap; }
+  #cap kbd, .card kbd { font-family: 'Plex', monospace; font-weight: 500; font-size: 0.78em; padding: 0.08em 0.38em; border-radius: 0.22em;
+    background: oklch(1 0 0 / 0.1); box-shadow: inset 0 0 0 1.5px oklch(1 0 0 / 0.18); vertical-align: 0.06em; }
+  #cap code { font-family: 'Plex', monospace; font-weight: 500; font-size: 0.86em; color: var(--acc); }
+  .card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .card .mark { width: 132px; height: 132px; margin-bottom: 34px; }
+  .card h1 { margin: 0; font-size: 136px; font-weight: 620; letter-spacing: -0.04em; line-height: 1; }
+  .card p { margin: 26px 0 0; font-size: 42px; font-weight: 450; color: var(--muted); letter-spacing: -0.01em; }
+  .card .chips { display: flex; gap: 14px; margin-top: 44px; }
+  .card .chips span { font-family: 'Plex', monospace; font-size: 25px; font-weight: 500; padding: 10px 20px; border-radius: 999px; color: var(--fg); background: oklch(1 0 0 / 0.06); box-shadow: inset 0 0 0 1.5px oklch(1 0 0 / 0.12); }
+  .card .chips span b { color: var(--acc); font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div id="grid"></div>
+<div id="world">
+  <div id="win"><iframe id="app" title="Rowan"></iframe></div>
+  <div id="cursor">
+    <div id="ring"></div>
+    <svg viewBox="0 0 28 28" width="28" height="28"><path d="M5 3.5v19.2l5.1-4.9 3.3 7.6 3.4-1.5-3.3-7.4h7.1z" fill="#fff" stroke="#111" stroke-width="1.6" stroke-linejoin="round"/></svg>
+  </div>
+</div>
+<div id="scrim"></div>
+<div id="cap"></div>
+<div class="card" id="intro">
+  <img class="mark" src="appicon.svg" alt="">
+  <h1>Rowan</h1>
+  <p>A desktop database client for PostgreSQL, MySQL and SQLite.</p>
+</div>
+<div class="card" id="outro">
+  <img class="mark" src="appicon.svg" alt="">
+  <h1>Rowan</h1>
+  <p>Read-only by default. Agents ask before they write.</p>
+  <div class="chips"><span><b>●</b> PostgreSQL</span><span><b>●</b> MySQL</span><span><b>●</b> SQLite</span><span>Go + Wails</span></div>
+</div>
+<script src="stage.js"></script>
+</body>
+</html>

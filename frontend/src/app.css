@@ -1,0 +1,203 @@
+/* Design tokens from the Rowan explorations. Light is the default. */
+:root {
+  --bg: oklch(0.985 0.002 85);
+  --panel: oklch(0.97 0.003 85);
+  --raised: oklch(0.995 0.001 85);
+  --sunken: oklch(0.955 0.003 85);
+  --hover: oklch(0.935 0.004 85);
+  --line: oklch(0.905 0.004 85);
+  --line-strong: oklch(0.83 0.006 85);
+  --text: oklch(0.24 0.006 85);
+  --muted: oklch(0.47 0.008 85);
+  --faint: oklch(0.6 0.007 85);
+  --acc-h: 290;
+  --accent: oklch(0.54 0.16 var(--acc-h));
+  --accent-soft: oklch(0.54 0.16 var(--acc-h) / 0.1);
+  --accent-text: oklch(0.48 0.16 var(--acc-h));
+  --on-accent: oklch(0.99 0 0);
+  --ok: oklch(0.52 0.13 150);
+  --ok-soft: oklch(0.6 0.13 150 / 0.12);
+  --warn: oklch(0.55 0.12 65);
+  --warn-soft: oklch(0.78 0.14 80 / 0.22);
+  --danger: oklch(0.54 0.18 25);
+  --danger-soft: oklch(0.6 0.18 25 / 0.1);
+  --syn-kw: oklch(0.48 0.16 var(--acc-h));
+  --syn-str: oklch(0.5 0.12 150);
+  --syn-num: oklch(0.55 0.13 50);
+  --syn-fn: oklch(0.5 0.12 235);
+  --syn-com: oklch(0.6 0.007 85);
+  --shadow: 0 1px 2px oklch(0 0 0 / 0.06), 0 10px 30px oklch(0 0 0 / 0.1);
+  --sans: 'Geist Variable', 'Geist', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --row-h: 30px;
+  --r-sm: 5px;
+  --r: 7px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: oklch(0.185 0.004 265);
+  --panel: oklch(0.205 0.004 265);
+  --raised: oklch(0.235 0.005 265);
+  --sunken: oklch(0.165 0.004 265);
+  --hover: oklch(0.265 0.005 265);
+  --line: oklch(0.29 0.005 265);
+  --line-strong: oklch(0.37 0.006 265);
+  --text: oklch(0.93 0.004 265);
+  --muted: oklch(0.72 0.006 265);
+  --faint: oklch(0.58 0.006 265);
+  --accent: oklch(0.72 0.13 var(--acc-h));
+  --accent-soft: oklch(0.72 0.13 var(--acc-h) / 0.15);
+  --accent-text: oklch(0.8 0.11 var(--acc-h));
+  --on-accent: oklch(0.18 0.03 var(--acc-h));
+  --ok: oklch(0.76 0.13 150);
+  --ok-soft: oklch(0.76 0.13 150 / 0.13);
+  --warn: oklch(0.82 0.13 80);
+  --warn-soft: oklch(0.82 0.13 80 / 0.14);
+  --danger: oklch(0.72 0.15 25);
+  --danger-soft: oklch(0.72 0.15 25 / 0.14);
+  --syn-kw: oklch(0.78 0.12 var(--acc-h));
+  --syn-str: oklch(0.78 0.11 150);
+  --syn-num: oklch(0.8 0.11 60);
+  --syn-fn: oklch(0.78 0.1 235);
+  --syn-com: oklch(0.56 0.006 265);
+  --shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 12px 36px oklch(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+
+/* The workspace layout (2b) is the technical treatment: square corners, mono throughout. */
+:root[data-layout='workspace'] {
+  --r-sm: 0px;
+  --r: 0px;
+  --r-lg: 0px;
+  --r-xl: 0px;
+  --row-h: 28px;
+}
+:root[data-density='compact'] { --row-h: 25px; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 400 13px/1.4 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+:root[data-layout='workspace'] body { font: 400 12.5px/1.4 var(--mono); }
+#app { height: 100%; }
+
+input, textarea, select, button { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; }
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+input, textarea { user-select: text; -webkit-user-select: text; }
+::placeholder { color: var(--faint); }
+::selection { background: oklch(0.6 0.15 var(--acc-h) / 0.28); }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+a { color: var(--accent-text); text-decoration: none; cursor: pointer; }
+a:hover { text-decoration: underline; }
+
+.mono { font-family: var(--mono); }
+.sans { font-family: var(--sans); }
+.muted { color: var(--muted); }
+.faint { color: var(--faint); }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.danger { color: var(--danger); }
+.accent { color: var(--accent-text); }
+.grow { flex: 1; min-width: 0; }
+.row { display: flex; align-items: center; }
+.ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.selectable { user-select: text; -webkit-user-select: text; cursor: text; }
+.nowrap { white-space: nowrap; }
+
+.kbd {
+  font: 500 10.5px/1 var(--mono);
+  padding: 3px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.btn {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+  font: 500 12px var(--sans);
+  white-space: nowrap;
+  color: var(--text);
+}
+:root[data-layout='workspace'] .btn { font-family: var(--mono); font-weight: 400; }
+.btn:hover:not(:disabled) { border-color: var(--line-strong); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.dark { background: var(--text); border-color: var(--text); color: var(--bg); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.btn.danger { color: var(--danger); }
+.btn.sm { height: 24px; padding: 0 8px; font-size: 11.5px; }
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--r);
+  color: var(--muted);
+  flex: none;
+}
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+
+.input {
+  height: 30px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--raised);
+  outline: none;
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input.mono { font: 400 12.5px var(--mono); }
+select.input { padding: 0 6px; }
+
+.seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--sunken); border: 1px solid var(--line); border-radius: 8px; }
+:root[data-layout='workspace'] .seg { border-radius: 0; }
+.seg button { height: 24px; padding: 0 10px; border-radius: 6px; font: 500 12px/24px var(--sans); color: var(--muted); white-space: nowrap; }
+:root[data-layout='workspace'] .seg button { border-radius: 0; font: 400 12px/24px var(--mono); }
+.seg button.on { background: var(--raised); color: var(--text); box-shadow: 0 0 0 1px var(--line), 0 1px 2px oklch(0 0 0 / 0.06); }
+
+.switch { width: 30px; height: 18px; border-radius: 9px; padding: 2px; display: inline-flex; background: var(--line-strong); flex: none; transition: background 0.12s; }
+.switch::after { content: ''; width: 14px; height: 14px; border-radius: 50%; background: oklch(0.99 0 0); box-shadow: 0 1px 2px oklch(0 0 0 / 0.2); transition: transform 0.12s; }
+.switch.on { background: var(--accent); }
+.switch.on::after { transform: translateX(12px); }
+.switch:disabled { opacity: 0.5; }
+:root[data-layout='workspace'] .switch, :root[data-layout='workspace'] .switch::after { border-radius: 0; }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; display: inline-block; }
+:root[data-layout='workspace'] .dot { border-radius: 0; }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 5px; font: 500 12px var(--sans); white-space: nowrap; }
+:root[data-layout='workspace'] .chip { border-radius: 0; font: 400 11.5px var(--mono); }
+
+.label { font: 500 11.5px var(--sans); color: var(--faint); }
+:root[data-layout='workspace'] .label { font: 400 12px var(--mono); }
+
+.scrim { position: fixed; inset: 0; background: oklch(0 0 0 / 0.28); z-index: 40; }
+:root[data-theme='dark'] .scrim { background: oklch(0 0 0 / 0.5); }
+
+.card { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-lg); }
+
+.empty { display: grid; place-items: center; height: 100%; color: var(--faint); text-align: center; padding: 24px; }
