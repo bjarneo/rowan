@@ -7,6 +7,8 @@ Rowan uses [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-03
+
 ### Added
 
 - Rowan connects to PostgreSQL, MySQL and SQLite.
