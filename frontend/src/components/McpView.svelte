@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/store.svelte'
   import { api } from '../lib/api'
-  import { connColor, ENGINE, initials, ago } from '../lib/format'
+  import { connColor, ENGINE, initials, ago, fmtN } from '../lib/format'
   import type { Connection, Policy, McpSettings } from '../lib/types'
   import Icon from './Icon.svelte'
 
@@ -17,6 +17,10 @@
   let client = $state('claude-desktop')
   let setup = $state<{ file: string; code: string } | null>(null)
   let expand = $state<string | null>(null)
+  // A large database has thousands of tables. The allowlist shows the first
+  // CHIP_MAX that match the filter.
+  const CHIP_MAX = 200
+  let chipFilter = $state('')
   let tablesOf = $state<Record<string, string[]>>({})
 
   $effect(() => {
@@ -48,6 +52,7 @@
       return
     }
     expand = c.id
+    chipFilter = ''
     if (!tablesOf[c.id]) {
       try {
         const s = await api.schema(c.id)
@@ -153,14 +158,23 @@
           <button class="btn sm" onclick={() => edit(c)}>{p.tables?.length ? `${p.tables.length} tables` : 'All tables'}<Icon name={expand === c.id ? 'expand_more' : 'chevron_right'} size={14} /></button>
         </div>
         {#if expand === c.id}
+          {@const f = chipFilter.trim().toLowerCase()}
+          {@const hits = f ? all.filter((t) => t.toLowerCase().includes(f)) : all}
+          {@const allowed = new Set(p.tables ?? [])}
           <div class="tables">
             <span class="faint">Agents see these tables. Statements that name a hidden table are blocked.</span>
+            {#if all.length > 40}
+              <input class="input cf" placeholder="Filter {fmtN(all.length)} tables" bind:value={chipFilter} spellcheck="false" />
+            {/if}
             <div class="chips">
-              {#each all as t}
-                {@const on = !p.tables?.length || p.tables.includes(t)}
+              {#each hits.slice(0, CHIP_MAX) as t}
+                {@const on = !allowed.size || allowed.has(t)}
                 <button class="chip tb" class:on onclick={() => toggleTable(c, t)}><Icon name={on ? 'check' : 'block'} size={13} />{t}</button>
               {/each}
             </div>
+            {#if hits.length > CHIP_MAX}
+              <span class="faint">{fmtN(hits.length - CHIP_MAX)} more tables match. Type more of a name to see them.</span>
+            {/if}
           </div>
         {/if}
       {:else}
@@ -212,6 +226,7 @@
   .chip.wr { background: var(--warn-soft); color: var(--warn); font-size: 11px; padding: 1px 6px; }
   .tables { padding: 4px 16px 14px 60px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cf { height: 28px; width: 260px; }
   .chip.tb { border: 1px solid var(--line); color: var(--faint); font: 400 12px var(--mono); }
   .chip.tb.on { background: var(--accent-soft); border-color: transparent; color: var(--accent-text); }
   .tool { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }

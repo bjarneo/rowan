@@ -41,6 +41,8 @@ type App struct {
 
 	prevMu     sync.Mutex
 	prevCancel context.CancelFunc
+	inspMu     sync.Mutex
+	inspCancel context.CancelFunc
 
 	results *resultCache
 
@@ -401,7 +403,7 @@ type SourceRef struct {
 type RunResult struct {
 	ID         string      `json:"id"`
 	Columns    []db.Column `json:"columns"`
-	Rows       [][]any     `json:"rows"`
+	Rows       db.Rows     `json:"rows"`
 	Truncated  bool        `json:"truncated"`
 	Affected   int64       `json:"affected"`
 	Message    string      `json:"message"`
@@ -559,7 +561,7 @@ type PreviewResult struct {
 	Schema        string        `json:"schema"`
 	Table         string        `json:"table"`
 	Columns       []db.Column   `json:"columns"`
-	Rows          [][]any       `json:"rows"`
+	Rows          db.Rows       `json:"rows"`
 	Interp        search.Interp `json:"interp"`
 	Matched       int64         `json:"matched"`
 	MatchedCapped bool          `json:"matchedCapped"`
@@ -621,7 +623,12 @@ func (a *App) Preview(req PreviewRequest) PreviewResult {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		out.Matched, out.MatchedCapped, cerr = c.Count(ctx, t.Schema, t.Name, where, args, 100000)
+		// The count reads every matching row, up to the cap. A filter on a
+		// column without an index can make that slow, so the count gets a
+		// budget of its own, and the rows do not wait for it.
+		cctx, ccancel := context.WithTimeout(ctx, 1200*time.Millisecond)
+		defer ccancel()
+		out.Matched, out.MatchedCapped, cerr = c.Count(cctx, t.Schema, t.Name, where, args, 100000)
 	}()
 	cols, rows, _, err := c.Select(ctx, q+" LIMIT "+fmt.Sprint(limit), args, limit)
 	wg.Wait()
@@ -698,7 +705,7 @@ type Link struct {
 	Table  string `json:"table"`
 	Schema string `json:"schema"`
 	Label  string `json:"label"`
-	Count  int64  `json:"count"`
+	Count  int64  `json:"count"` // -1 when Rowan did not count, because the column has no index
 	Capped bool   `json:"capped"`
 	SQL    string `json:"sql"`
 }
@@ -719,7 +726,15 @@ func (a *App) Inspect(req InspectRequest) Inspection {
 	if err != nil {
 		return out
 	}
+	// A new selection cancels the inspection of the row before it, so
+	// arrow keys through a grid do not queue lookups on the pool.
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	a.inspMu.Lock()
+	if a.inspCancel != nil {
+		a.inspCancel()
+	}
+	a.inspCancel = cancel
+	a.inspMu.Unlock()
 	defer cancel()
 	t, err := c.Table(ctx, req.Schema, req.Table)
 	if err != nil {
@@ -770,6 +785,12 @@ func (a *App) Inspect(req InspectRequest) Inspection {
 			continue
 		}
 		val := fmt.Sprint(v)
+		sql := "SELECT * FROM " + db.TableRef(e, r.Schema, r.Table) + " WHERE " + db.QuoteIdent(e, r.Column) + " = " + sqlLiteral(val) + ";"
+		if !r.Indexed {
+			// A count would read the whole referencing table for each row.
+			slots[i] = &Link{Column: r.Column, Table: r.Table, Schema: r.Schema, Count: -1, SQL: sql}
+			continue
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -778,8 +799,7 @@ func (a *App) Inspect(req InspectRequest) Inspection {
 			if err != nil {
 				return
 			}
-			slots[i] = &Link{Column: r.Column, Table: r.Table, Schema: r.Schema, Count: cnt, Capped: capped,
-				SQL: "SELECT * FROM " + db.TableRef(e, r.Schema, r.Table) + " WHERE " + db.QuoteIdent(e, r.Column) + " = " + sqlLiteral(val) + ";"}
+			slots[i] = &Link{Column: r.Column, Table: r.Table, Schema: r.Schema, Count: cnt, Capped: capped, SQL: sql}
 		}()
 	}
 	wg.Wait()

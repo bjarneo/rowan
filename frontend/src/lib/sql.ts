@@ -45,6 +45,80 @@ export function highlight(src: string, hashComments = false): string {
   return out
 }
 
+/**
+ * Highlights a range of a large text. It tokenizes from the nearest
+ * checkpoint before the range and builds HTML only for the range, so the
+ * cost of a key press does not grow with the length of the script.
+ * Checkpoints are token starts at line starts. A checkpoint stays valid
+ * while the text up to and including it does not change.
+ */
+export class Highlighter {
+  private src = ''
+  private hash = false
+  private marks: number[] = [0]
+
+  /** Returns HTML for src from offset `from` to offset `to`. Both are line starts. */
+  html(src: string, from: number, to: number, hashComments = false): string {
+    if (hashComments !== this.hash) {
+      this.hash = hashComments
+      this.marks = [0]
+    } else if (src !== this.src) {
+      const cp = commonPrefix(this.src, src)
+      let k = this.marks.length
+      while (k > 1 && this.marks[k - 1] >= cp) k--
+      this.marks.length = k
+    }
+    this.src = src
+    const marks = this.marks
+    let lo = 0
+    let hi = marks.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1
+      if (marks[mid] <= from) lo = mid
+      else hi = mid - 1
+    }
+    let out = ''
+    let m: RegExpExecArray | null
+    TOKEN.lastIndex = marks[lo]
+    while ((m = TOKEN.exec(src))) {
+      const a = m.index
+      if (a >= to) break
+      const last = marks[marks.length - 1]
+      if (a > last + 4096 && src.charCodeAt(a - 1) === 10 && !m[6]) marks.push(a)
+      let t = m[0]
+      if (m[1] && t[0] === '#' && !hashComments) {
+        TOKEN.lastIndex = a + 1
+        if (a >= from) out += '#'
+        continue
+      }
+      const b = a + t.length
+      if (b <= from) continue
+      if (a < from || b > to) t = src.slice(Math.max(a, from), Math.min(b, to))
+      if (m[1]) out += `<span class="c">${esc(t)}</span>`
+      else if (m[2]) out += `<span class="s">${esc(t)}</span>`
+      else if (m[3]) out += esc(t)
+      else if (m[4]) out += `<span class="n">${t}</span>`
+      else if (m[5]) {
+        if (KW.has(t.toLowerCase())) out += `<span class="k">${t}</span>`
+        else if (src[TOKEN.lastIndex] === '(') out += `<span class="f">${t}</span>`
+        else out += t
+      } else if (m[6]) out += t
+      else out += `<span class="p">${esc(t)}</span>`
+    }
+    return out
+  }
+}
+
+/** The length of the common prefix of a and b. */
+function commonPrefix(a: string, b: string) {
+  const n = Math.min(a.length, b.length)
+  let i = 0
+  const step = 2048
+  while (i + step <= n && a.slice(i, i + step) === b.slice(i, i + step)) i += step
+  while (i < n && a.charCodeAt(i) === b.charCodeAt(i)) i++
+  return i
+}
+
 const BREAK_BEFORE = new Set(['select', 'from', 'where', 'group', 'order', 'having', 'limit', 'offset', 'union', 'values', 'set', 'returning', 'join', 'left', 'right', 'inner', 'full', 'cross', 'on', 'insert', 'update', 'delete', 'with'])
 const JOIN_WORDS = new Set(['left', 'right', 'inner', 'full', 'cross', 'outer'])
 

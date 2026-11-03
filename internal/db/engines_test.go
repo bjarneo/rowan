@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"rowan/internal/config"
 )
@@ -129,3 +130,59 @@ func testEngine(t *testing.T, engine string) {
 
 func TestPostgres(t *testing.T) { testEngine(t, "postgres") }
 func TestMySQL(t *testing.T)    { testEngine(t, "mysql") }
+
+// testBounded checks that Rowan caps a result on the server: the result
+// stops at the limit, and the connection stays in the pool.
+func testBounded(t *testing.T, engine string) {
+	ctx := context.Background()
+	c := engineConn(t, engine)
+	pid := map[string]string{"postgres": "pg_backend_pid()", "mysql": "CONNECTION_ID()"}[engine]
+	run := func(limit int, stmts ...string) *Result {
+		t.Helper()
+		res, err := c.Run(ctx, stmts, false, limit)
+		if err != nil {
+			t.Fatalf("%v: %v", stmts, err)
+		}
+		return res
+	}
+	q := "SELECT " + pid + " AS pid, o.id, o.id AS id2 FROM orders o ORDER BY o.id DESC -- a trailing comment"
+	a := run(5, q)
+	if len(a.Rows) != 5 || !a.Truncated || len(a.Columns) != 3 || a.Columns[1].Name != "id" {
+		t.Fatalf("capped result: %d rows, truncated %v, columns %+v", len(a.Rows), a.Truncated, a.Columns)
+	}
+	b := run(5, q)
+	if a.Rows[0][0] != b.Rows[0][0] {
+		t.Fatalf("the capped query closed its connection: backend %v, then %v", a.Rows[0][0], b.Rows[0][0])
+	}
+	if r := run(5, "SELECT id FROM orders ORDER BY id LIMIT 5"); len(r.Rows) != 5 || r.Truncated {
+		t.Fatalf("exact result: %d rows, truncated %v", len(r.Rows), r.Truncated)
+	}
+	if r := run(5, "SELECT id FROM orders ORDER BY id LIMIT 50"); len(r.Rows) != 5 || !r.Truncated {
+		t.Fatalf("larger LIMIT: %d rows, truncated %v", len(r.Rows), r.Truncated)
+	}
+	if r := run(3, "SELECT 1", "WITH x AS (SELECT id FROM orders) SELECT * FROM x"); len(r.Rows) != 3 || !r.Truncated {
+		t.Fatalf("script: %d rows, truncated %v", len(r.Rows), r.Truncated)
+	}
+	if engine == "postgres" {
+		// A canceled query keeps its connection: the server gets a cancel
+		// request, and the next query runs on the same backend.
+		cctx, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+		t0 := time.Now()
+		_, err := c.Run(cctx, []string{"SELECT pg_sleep(5)"}, false, 5)
+		cancel()
+		if err == nil || time.Since(t0) > 2*time.Second {
+			t.Fatalf("cancel: %v after %v", err, time.Since(t0))
+		}
+		if r := run(5, q); r.Rows[0][0] != a.Rows[0][0] {
+			t.Fatalf("the canceled query closed its connection: backend %v, then %v", a.Rows[0][0], r.Rows[0][0])
+		}
+		// Duplicate column names pass through the outer LIMIT.
+		r := run(5, "SELECT * FROM orders o JOIN customers c ON c.id = o.customer_id")
+		if len(r.Rows) != 5 || !r.Truncated || r.Columns[0].Name != "id" {
+			t.Fatalf("join: %d rows, columns %+v", len(r.Rows), r.Columns)
+		}
+	}
+}
+
+func TestPostgresBounded(t *testing.T) { testBounded(t, "postgres") }
+func TestMySQLBounded(t *testing.T)    { testBounded(t, "mysql") }

@@ -80,13 +80,14 @@
           {/if}
         </div>
       {/each}
-      {#if insp?.refBy?.some((l) => l.count > 0)}
+      {#if insp?.refBy?.some((l) => l.count !== 0)}
         <div class="f">
           <span class="k">referenced by</span>
           <span class="v refs">
-            {#each insp.refBy.filter((l) => l.count > 0) as l, i}
+            <!-- A count of -1 means the column has no index, so Rowan did not count. -->
+            {#each insp.refBy.filter((l) => l.count !== 0) as l, i}
               {#if i > 0}<span class="faint sep">·</span>{/if}
-              <button class="link" onclick={() => onfollow(l, '')} title="{l.table}.{l.column}">{l.capped ? fmtN(l.count) + '+' : fmtN(l.count)} {l.table}</button>
+              <button class="link" onclick={() => onfollow(l, '')} title={l.count < 0 ? `${l.table}.${l.column} has no index. Rowan did not count the rows.` : `${l.table}.${l.column}`}>{l.count < 0 ? '' : (l.capped ? fmtN(l.count) + '+' : fmtN(l.count)) + ' '}{l.table}</button>
             {/each}
           </span>
         </div>

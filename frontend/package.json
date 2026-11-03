@@ -8,7 +8,7 @@
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "icons": "node scripts/icons.mjs",
-    "test": "rolldown tests/complete.test.ts -o node_modules/.cache/rowan-tests/complete.test.mjs -f esm -p node --log-level warn && node node_modules/.cache/rowan-tests/complete.test.mjs"
+    "test": "rolldown tests/complete.test.ts -o node_modules/.cache/rowan-tests/complete.test.mjs -f esm -p node --log-level warn && rolldown tests/sql.test.ts -o node_modules/.cache/rowan-tests/sql.test.mjs -f esm -p node --log-level warn && node node_modules/.cache/rowan-tests/complete.test.mjs && node node_modules/.cache/rowan-tests/sql.test.mjs"
   },
   "devDependencies": {
     "@material-symbols/svg-300": "^0.48.2",

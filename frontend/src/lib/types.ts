@@ -131,7 +131,7 @@ export interface ColumnSet {
   truncated: boolean
 }
 
-export interface Ref { schema: string; table: string; column: string; local: string }
+export interface Ref { schema: string; table: string; column: string; local: string; indexed?: boolean }
 export interface ColumnInfo { name: string; type: string; nullable: boolean; default: string; pk: boolean; unique: boolean; fk: Ref | null; numeric: boolean }
 export interface TableInfo {
   schema: string

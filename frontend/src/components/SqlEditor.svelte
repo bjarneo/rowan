@@ -1,9 +1,11 @@
 <script lang="ts">
   // A textarea over a highlighted layer. The textarea holds the caret and
   // selection. The layer below draws the colors. A completion list opens at
-  // the caret while the user types a name.
+  // the caret while the user types a name. The layer and the line numbers
+  // render only the lines near the view, so a script of thousands of lines
+  // types and scrolls without delay.
   import { untrack } from 'svelte'
-  import { highlight } from '../lib/sql'
+  import { Highlighter } from '../lib/sql'
   import { complete, type Completion, type Item, type Kind, type Source } from '../lib/complete'
 
   let {
@@ -29,20 +31,41 @@
   } = $props()
 
   let ta: HTMLTextAreaElement
-  let layer: HTMLPreElement
-  let gutter: HTMLDivElement
 
-  const html = $derived(highlight(value, hashComments) + '\n')
-  const lines = $derived(value.split('\n').length)
+  // The editor draws lines first to last. That window moves in steps of
+  // CHUNK lines, so most scroll steps only move it with a transform.
+  const LINE_H = 21
+  const PAD = 10
+  const CHUNK = 40
+  let top = $state(0)
+  let left = $state(0)
+  let viewH = $state(400)
+  const starts = $derived.by(() => {
+    const out = [0]
+    for (let i = value.indexOf('\n'); i >= 0; i = value.indexOf('\n', i + 1)) out.push(i + 1)
+    return out
+  })
+  const lines = $derived(starts.length)
+  const first = $derived(Math.min(lines - 1, Math.max(0, Math.floor(Math.max(0, top - PAD) / LINE_H / CHUNK) * CHUNK - CHUNK)))
+  const last = $derived(Math.min(lines, first + Math.ceil(viewH / LINE_H) + 3 * CHUNK))
+  const hl = new Highlighter()
+  const html = $derived(hl.html(value, starts[first], last < lines ? starts[last] : value.length, hashComments))
+  const shift = $derived(first * LINE_H - top)
 
   $effect(() => {
     if (autofocus) ta?.focus()
   })
 
+  // A shorter value from outside, such as a new draft, can clamp the scroll
+  // position without a scroll event. Read it again after each change.
+  $effect(() => {
+    value
+    if (ta && (ta.scrollTop !== top || ta.scrollLeft !== left)) untrack(sync)
+  })
+
   function sync() {
-    layer.scrollTop = ta.scrollTop
-    layer.scrollLeft = ta.scrollLeft
-    gutter.scrollTop = ta.scrollTop
+    top = ta.scrollTop
+    left = ta.scrollLeft
     if (ac) ac = { ...ac, ...place(ac.from) }
   }
 
@@ -81,6 +104,67 @@
     }
     ta.setSelectionRange(caret, caret)
     selChange()
+  }
+
+  // ---- Large pastes ----
+  // WebKit inserts pasted text one line at a time, and the cost grows faster
+  // than the text: 1,000 lines take more than a second, 3,000 lines about
+  // 10 seconds. A large paste goes in with setRangeText instead. The browser
+  // does not record that edit, so the editor keeps its own undo for it.
+
+  const BIG_PASTE = 4000
+  type Paste = { before: string; after: string; a: number; b: number; caret: number }
+  let undoPastes: Paste[] = []
+  let redoPastes: Paste[] = []
+
+  function setText(v: string, a: number, b: number) {
+    ta.value = v
+    ta.setSelectionRange(a, b)
+    lastLen = v.length
+    closer = -1
+    onchange(v)
+    selChange()
+  }
+
+  function onPaste(e: ClipboardEvent) {
+    const raw = e.clipboardData?.getData('text/plain')
+    if (!raw || raw.length < BIG_PASTE) return
+    e.preventDefault()
+    closeAC()
+    const text = raw.replace(/\r\n?/g, '\n')
+    const a = ta.selectionStart
+    const b = ta.selectionEnd
+    const before = ta.value
+    ta.setRangeText(text, a, b, 'end')
+    undoPastes = [...undoPastes.slice(-19), { before, after: ta.value, a, b, caret: a + text.length }]
+    redoPastes = []
+    lastLen = ta.value.length
+    closer = -1
+    onchange(ta.value)
+    selChange()
+  }
+
+  /** Undoes or redoes a large paste. Returns true when it handled the key. */
+  function pasteHistory(e: KeyboardEvent) {
+    const k = e.key.toLowerCase()
+    const redo = (k === 'z' && e.shiftKey) || (k === 'y' && !e.shiftKey)
+    if (k === 'z' && !e.shiftKey) {
+      const u = undoPastes[undoPastes.length - 1]
+      if (!u || ta.value !== u.after) return false
+      undoPastes = undoPastes.slice(0, -1)
+      redoPastes = [...redoPastes, u]
+      setText(u.before, u.a, u.b)
+      return true
+    }
+    if (redo) {
+      const r = redoPastes[redoPastes.length - 1]
+      if (!r || ta.value !== r.before) return false
+      redoPastes = redoPastes.slice(0, -1)
+      undoPastes = [...undoPastes, r]
+      setText(r.after, r.caret, r.caret)
+      return true
+    }
+    return false
   }
 
   // ---- Completion ----
@@ -185,6 +269,11 @@
 
   function onKey(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey
+    if (mod && !e.altKey && pasteHistory(e)) {
+      e.preventDefault()
+      closeAC()
+      return
+    }
     if (ac) {
       const n = ac.items.length
       const plain = !mod && !e.shiftKey && !e.altKey
@@ -263,14 +352,16 @@
 </script>
 
 <div class="ed">
-  <div class="gut" bind:this={gutter} aria-hidden="true">
-    {#each { length: lines } as _, i}<div>{i + 1}</div>{/each}
-    <div>&nbsp;</div>
+  <div class="gut" aria-hidden="true">
+    <div style="transform:translateY({shift}px)">
+      {#each { length: last - first } as _, k}<div>{first + k + 1}</div>{/each}
+    </div>
   </div>
   <div class="body">
-    <pre bind:this={layer} aria-hidden="true">{@html html}</pre>
+    <pre aria-hidden="true"><div style="transform:translate({-left}px,{shift}px)">{@html html}</div></pre>
     <textarea
       bind:this={ta}
+      bind:clientHeight={viewH}
       {value}
       {placeholder}
       spellcheck="false"
@@ -281,6 +372,7 @@
       aria-controls="sql-completion"
       aria-autocomplete="list"
       oninput={onInput}
+      onpaste={onPaste}
       onscroll={sync}
       onkeydown={onKey}
       onselect={selChange}

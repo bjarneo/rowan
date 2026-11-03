@@ -61,6 +61,10 @@ type Ref struct {
 	Table  string `json:"table"`
 	Column string `json:"column"`
 	Local  string `json:"local"`
+	// Indexed reports, for a referenced-by entry, that an index starts with
+	// the referencing column. Without one, a count of the rows that point
+	// at a row reads the whole referencing table.
+	Indexed bool `json:"indexed,omitempty"`
 }
 
 // Index describes one index.
@@ -390,7 +394,8 @@ WHERE c.conrelid = `+rel+` AND c.contype IN ('p','u','f')`, schema, name)
 	}
 	cons.Close()
 	refs, err := db.QueryContext(ctx, `
-SELECT nr.nspname, cr.relname, a.attname, af.attname
+SELECT nr.nspname, cr.relname, a.attname, af.attname,
+       EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1])
 FROM pg_constraint c
 JOIN pg_class cr ON cr.oid = c.conrelid JOIN pg_namespace nr ON nr.oid = cr.relnamespace
 JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
@@ -402,7 +407,7 @@ ORDER BY 2, 3`, schema, name)
 	}
 	for refs.Next() {
 		var r Ref
-		if err := refs.Scan(&r.Schema, &r.Table, &r.Column, &r.Local); err != nil {
+		if err := refs.Scan(&r.Schema, &r.Table, &r.Column, &r.Local, &r.Indexed); err != nil {
 			refs.Close()
 			return nil, err
 		}
@@ -494,7 +499,8 @@ WHERE REFERENCED_TABLE_SCHEMA = ? AND REFERENCED_TABLE_NAME = ? ORDER BY TABLE_N
 		return nil, err
 	}
 	for refs.Next() {
-		var r Ref
+		// InnoDB keeps an index on every foreign key column.
+		r := Ref{Indexed: true}
 		if err := refs.Scan(&r.Schema, &r.Table, &r.Column, &r.Local); err != nil {
 			refs.Close()
 			return nil, err
@@ -627,14 +633,16 @@ func liteTable(ctx context.Context, db *sql.DB, name string) (*Table, error) {
 		}
 	}
 	// Referenced by: scan the other tables. SQLite has no reverse catalog.
-	all, err := db.QueryContext(ctx, `SELECT m.name, f."from", COALESCE(f."to", '') FROM sqlite_master m, pragma_foreign_key_list(m.name) f WHERE m.type = 'table' AND f."table" = ? COLLATE NOCASE ORDER BY m.name`, name)
+	all, err := db.QueryContext(ctx, `SELECT m.name, f."from", COALESCE(f."to", ''),
+       EXISTS (SELECT 1 FROM pragma_index_list(m.name) il, pragma_index_info(il.name) ii WHERE ii.seqno = 0 AND ii.name = f."from")
+FROM sqlite_master m, pragma_foreign_key_list(m.name) f WHERE m.type = 'table' AND f."table" = ? COLLATE NOCASE ORDER BY m.name`, name)
 	if err != nil {
 		return nil, err
 	}
 	defer all.Close()
 	for all.Next() {
 		var r Ref
-		if err := all.Scan(&r.Table, &r.Column, &r.Local); err != nil {
+		if err := all.Scan(&r.Table, &r.Column, &r.Local, &r.Indexed); err != nil {
 			return nil, err
 		}
 		r.Schema = "main"

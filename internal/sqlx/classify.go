@@ -467,3 +467,64 @@ func ParseInsert(stmt string, hashComments bool) (Insert, bool) {
 	}
 	return ins, ins.Rows > 0
 }
+
+// Bounded reports whether Rowan can cap the rows of stmt on the server: a
+// SELECT, WITH, VALUES or TABLE statement that does not write, and has no
+// INTO and no locking clause such as FOR UPDATE.
+func Bounded(stmt string, hashComments bool) bool {
+	info := Classify(stmt, hashComments)
+	switch info.Verb {
+	case "SELECT", "WITH", "VALUES", "TABLE":
+	default:
+		return false
+	}
+	if info.Write || !info.Rows {
+		return false
+	}
+	toks := Significant(Lex(stmt, hashComments))
+	for j, t := range toks {
+		if t.Is("into") {
+			return false
+		}
+		if t.Is("for") && j+1 < len(toks) {
+			switch n := toks[j+1]; {
+			case n.Is("update"), n.Is("share"), n.Is("no"), n.Is("key"):
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// HintAt returns the byte offset after the SELECT keyword of the outer query
+// block of stmt, where a MySQL optimizer hint goes. It returns -1 when the
+// statement does not start that way or already has a hint there.
+func HintAt(stmt string, hashComments bool) int {
+	toks := Lex(stmt, hashComments)
+	depth := 0
+	for i, t := range toks {
+		switch {
+		case t.Kind == Punct && t.Text == "(":
+			depth++
+		case t.Kind == Punct && t.Text == ")":
+			depth--
+		case depth == 0 && t.Is("select"):
+			for _, n := range toks[i+1:] {
+				if n.Kind == Space {
+					continue
+				}
+				if n.Kind == Comment && strings.HasPrefix(n.Text, "/*+") {
+					return -1
+				}
+				break
+			}
+			return t.Pos + len(t.Text)
+		}
+	}
+	return -1
+}
+
+// TopLimit reports whether stmt has a LIMIT clause outside parentheses.
+func TopLimit(stmt string, hashComments bool) bool {
+	return hasTopWord(Significant(Lex(stmt, hashComments)), "limit")
+}

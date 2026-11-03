@@ -16,6 +16,7 @@ window, and make the screenshots and the promo video.
 | `frontend/src` | The Svelte 5 UI. `lib/complete.ts` is the completion engine |
 | `scripts/demo-pg` | A PostgreSQL demo database with 46 million rows |
 | `scripts/promo` | The scripts that make the screenshots and the promo video |
+| `scripts/perf` | The benchmark of the backend calls and the UI on the demo database |
 | `site` | The GitHub Pages site |
 
 ## Build
@@ -96,6 +97,28 @@ node scripts/cdp.mjs steps.json
 
 `steps.json` is a list of steps such as `{"nav": "http://127.0.0.1:5199/"}`,
 `{"type": "orders refunded"}`, `{"key": "Enter"}` and `{"shot": "out.png"}`.
+
+## Measure performance
+
+`scripts/perf/bench.mjs` starts the dev server with the demo database. It
+times the backend calls, then runs the UI steps in `scripts/perf/suite.js`
+and prints one line per step. A UI step ends at the frame after the step is
+done.
+
+```sh
+scripts/demo-pg/start.sh
+ROWAN_DEMO_PG_PORT=55433 node scripts/perf/bench.mjs
+ROWAN_DEMO_PG_PORT=55433 ENGINE=webkit node scripts/perf/bench.mjs
+```
+
+- `ENGINE=webkit` runs the UI steps in WebKitGTK, the engine of the Linux
+  app. It needs PyGObject and WebKitGTK 4.1. The view is offscreen, so no
+  window opens, and it renders without the GPU.
+- `CPU_SLOWDOWN=4` runs Chromium on a CPU that is 4 times slower.
+- `NO_BUILD=1` skips the frontend build.
+
+Run the benchmark before and after a change to the grid, the sidebar, the
+editor or the query path. A step that takes more than 16 ms misses a frame.
 
 ## Screenshots and the promo video
 

@@ -24,7 +24,7 @@ type Column struct {
 // Result is the outcome of a script. Rows hold display strings, or nil for NULL.
 type Result struct {
 	Columns    []Column `json:"columns"`
-	Rows       [][]any  `json:"rows"`
+	Rows       Rows     `json:"rows"`
 	Truncated  bool     `json:"truncated"`
 	Affected   int64    `json:"affected"`
 	Message    string   `json:"message"`
@@ -103,7 +103,8 @@ func (c *Conn) Run(ctx context.Context, stmts []string, write bool, limit int) (
 		info := infos[i]
 		last := i == len(stmts)-1
 		if info.Rows {
-			cols, rows, trunc, err := query(ctx, conn, s, limit, last)
+			q, stop := bound(engine, s, limit)
+			cols, rows, trunc, err := query(ctx, conn, q, limit, last && stop)
 			if err != nil {
 				return fail(i, err)
 			}
@@ -146,9 +147,37 @@ func compact(msgs []string) []string {
 	return append(msgs[:2], fmt.Sprintf("%d more", len(msgs)-2))
 }
 
-// query reads up to limit rows. When the result has more rows and last is
-// true, it cancels the statement so the server stops work.
-func query(ctx context.Context, conn *sql.Conn, stmt string, limit int, last bool) ([]Column, [][]any, bool, error) {
+// bound caps a plain query at limit+1 rows on the server. The planner then
+// plans for the rows that Rowan reads, with a top-N sort or an index scan,
+// and the server stops on its own, so the connection stays in the pool. The
+// extra row tells Rowan that the result has more rows. stop reports whether
+// Rowan must still cancel the statement when more rows arrive.
+//
+// PostgreSQL gets an outer LIMIT. The line breaks keep a trailing comment
+// inside the subquery. MySQL gets a sql_select_limit hint, because a derived
+// table there rejects duplicate column names. A LIMIT clause in the query
+// takes precedence over the hint, so Rowan still cancels in that case.
+func bound(engine, stmt string, limit int) (q string, stop bool) {
+	switch engine {
+	case "postgres":
+		if sqlx.Bounded(stmt, false) {
+			return "SELECT * FROM (\n" + stmt + "\n) rowan_q LIMIT " + strconv.Itoa(limit+1), false
+		}
+	case "mysql":
+		if sqlx.Bounded(stmt, true) {
+			if at := sqlx.HintAt(stmt, true); at >= 0 {
+				return stmt[:at] + " /*+ SET_VAR(sql_select_limit = " + strconv.Itoa(limit+1) + ") */" + stmt[at:], sqlx.TopLimit(stmt, true)
+			}
+		}
+	}
+	return stmt, true
+}
+
+// query reads up to limit rows. When the result has more rows and stop is
+// true, it cancels the statement so the server stops work. A canceled MySQL
+// statement closes its connection. PostgreSQL gets a cancel request and keeps
+// the connection.
+func query(ctx context.Context, conn *sql.Conn, stmt string, limit int, stop bool) ([]Column, [][]any, bool, error) {
 	qctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	rows, err := conn.QueryContext(qctx, stmt)
@@ -156,7 +185,7 @@ func query(ctx context.Context, conn *sql.Conn, stmt string, limit int, last boo
 		return nil, nil, false, err
 	}
 	cols, out, trunc, err := scan(rows, limit, func() {
-		if last {
+		if stop {
 			cancel()
 		}
 	})

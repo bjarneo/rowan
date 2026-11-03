@@ -33,6 +33,23 @@ Rowan uses [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
   word such as `refunded` matches a column value, also in a PostgreSQL enum.
 - The `list_tables` tool takes optional `schema` and `filter` arguments. It
   returns at most 200 tables and gives the table count of each schema.
+- Rowan caps a result on the server. PostgreSQL runs the query inside an
+  outer `LIMIT`, and MySQL gets a `sql_select_limit` hint. A sort over
+  millions of rows returns the first rows in milliseconds.
+- The grid, the workspace sidebar and the editor render only what is in view.
+  A result with 120 columns, a schema with thousands of tables and a script
+  with thousands of lines scroll at full frame rate.
+- A paste of 4,000 characters or more goes into the editor at once. WebKitGTK
+  takes about 10 seconds to insert 3,000 lines one at a time. `Ctrl+Z` undoes
+  the paste.
+- A canceled PostgreSQL query keeps its connection. The connection pool keeps
+  all of its connections open, so the row inspector and the search preview do
+  not open a connection for each lookup.
+- The row inspector does not count referencing rows through a column without
+  an index. A new selection cancels the lookups for the previous row.
+- The search preview shows the rows without a wait for a slow match count.
+- `scripts/perf/bench.mjs` measures the backend calls and the UI on the demo
+  database, in Chromium or in WebKitGTK.
 - Export writes a query result to a CSV, JSON or SQL file.
 - Rowan stores passwords in the system keychain.
 - `rowan --version` and `rowan version` print the version.

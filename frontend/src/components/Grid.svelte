@@ -1,7 +1,8 @@
 <script lang="ts">
-  // A virtualized result grid. It renders only the rows in view, so large
-  // results scroll at full frame rate. Rows are not copied: sorting keeps an
-  // index array.
+  // A virtualized result grid. It renders only the rows and the columns in
+  // view, so large and wide results scroll at full frame rate. Rows are not
+  // copied: sorting keeps an index array. Rows are keyed, so a scroll step
+  // creates only the rows that come into view.
   import type { Column, Cell } from '../lib/types'
   import { colWidth } from '../lib/format'
   import { api } from '../lib/api'
@@ -30,7 +31,9 @@
 
   let viewport: HTMLDivElement
   let scrollTop = $state(0)
+  let scrollLeft = $state(0)
   let height = $state(400)
+  let width = $state(1200)
   let sort = $state<{ col: number; dir: 1 | -1 } | null>(null)
   let selCol = $state(-1)
 
@@ -38,8 +41,28 @@
   const charW = $derived(mono ? 7.6 : 7.1)
   const widths = $derived(columns.map((c, j) => colWidth(c.name, c.type, sample(j), charW)))
   const gutterW = $derived(gutter ? Math.max(44, String(rows.length).length * 8 + 22) : 0)
-  const template = $derived((gutter ? gutterW + 'px ' : '') + widths.map((w) => w + 'px').join(' ') + ' minmax(0,1fr)')
-  const totalW = $derived(gutterW + widths.reduce((a, b) => a + b, 0))
+  // lefts[j] is the x of column j after the gutter.
+  const lefts = $derived.by(() => {
+    const out = new Array<number>(widths.length + 1)
+    out[0] = 0
+    for (let j = 0; j < widths.length; j++) out[j + 1] = out[j] + widths[j]
+    return out
+  })
+  const totalW = $derived(gutterW + lefts[widths.length])
+  // The columns in view, with 2 more on each side.
+  const colStart = $derived.by(() => {
+    let j = 0
+    while (j < widths.length && gutterW + lefts[j + 1] <= scrollLeft) j++
+    return Math.max(0, j - 2)
+  })
+  const colEnd = $derived.by(() => {
+    let j = colStart
+    while (j < widths.length && gutterW + lefts[j] < scrollLeft + width) j++
+    return Math.min(widths.length, j + 2)
+  })
+  const cols = $derived(Array.from({ length: colEnd - colStart }, (_, k) => colStart + k))
+  // A spacer track holds the place of the columns left of the view.
+  const template = $derived((gutter ? gutterW + 'px ' : '') + lefts[colStart] + 'px ' + cols.map((j) => widths[j] + 'px').join(' ') + ' minmax(0,1fr)')
 
   // Reset sorting when a new result arrives.
   let lastRows: Cell[][] | null = null
@@ -48,8 +71,12 @@
       lastRows = rows
       sort = null
       selCol = -1
-      if (viewport) viewport.scrollTop = 0
+      if (viewport) {
+        viewport.scrollTop = 0
+        viewport.scrollLeft = 0
+      }
       scrollTop = 0
+      scrollLeft = 0
     }
   })
 
@@ -81,6 +108,16 @@
 
   function onScroll() {
     scrollTop = viewport.scrollTop
+    scrollLeft = viewport.scrollLeft
+  }
+
+  /** Scrolls sideways so that column j is in view. */
+  function showCol(j: number) {
+    if (j < 0) return
+    const x = gutterW + lefts[j]
+    const w = widths[j]
+    if (x - gutterW < viewport.scrollLeft) viewport.scrollLeft = x - gutterW
+    else if (x + w > viewport.scrollLeft + width) viewport.scrollLeft = x + w - width
   }
 
   function toggleSort(j: number) {
@@ -89,11 +126,12 @@
   }
 
   function onCellClick(e: MouseEvent) {
-    const cell = (e.target as HTMLElement).closest<HTMLElement>('[data-j]')
-    const row = cell?.parentElement
-    if (!cell || !row?.dataset.i) return
-    selected = +row.dataset.i
-    selCol = +cell.dataset.j!
+    const t = e.target as HTMLElement
+    const row = t.closest<HTMLElement>('[data-i]')
+    if (!row) return
+    selected = +row.dataset.i!
+    const cell = t.closest<HTMLElement>('[data-j]')
+    selCol = cell ? +cell.dataset.j! : -1
   }
 
   function onKey(e: KeyboardEvent) {
@@ -104,8 +142,8 @@
     else if (e.key === 'ArrowUp') next = Math.max(0, pos - 1)
     else if (e.key === 'PageDown') next = Math.min(order.length - 1, pos + Math.floor(height / rowH))
     else if (e.key === 'PageUp') next = Math.max(0, pos - Math.floor(height / rowH))
-    else if (e.key === 'ArrowRight') { selCol = Math.min(columns.length - 1, selCol + 1); e.preventDefault(); return }
-    else if (e.key === 'ArrowLeft') { selCol = Math.max(0, selCol - 1); e.preventDefault(); return }
+    else if (e.key === 'ArrowRight') { selCol = Math.min(columns.length - 1, selCol + 1); showCol(selCol); e.preventDefault(); return }
+    else if (e.key === 'ArrowLeft') { selCol = Math.max(0, selCol - 1); showCol(selCol); e.preventDefault(); return }
     else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
       const v = selected >= 0 ? (selCol >= 0 ? rows[selected][selCol] : rows[selected].map((x) => x ?? 'NULL').join('\t')) : null
       if (v != null) {
@@ -128,16 +166,21 @@
   class:mono
   bind:this={viewport}
   bind:clientHeight={height}
+  bind:clientWidth={width}
   onscroll={onScroll}
   onkeydown={onKey}
   tabindex="0"
   role="grid"
-  style="--rh:{rowH}px"
+  aria-colcount={columns.length}
+  aria-rowcount={rows.length}
+  style="--rh:{rowH}px;--tpl:{template}"
 >
-  <div class="head" style="grid-template-columns:{template};min-width:{totalW}px" role="row">
+  <div class="head" style="min-width:{totalW}px" role="row">
     {#if gutter}<span class="g"></span>{/if}
-    {#each columns as c, j}
-      <button class="h" class:num={c.numeric} onclick={() => toggleSort(j)} title={c.type} role="columnheader">
+    <span></span>
+    {#each cols as j (j)}
+      {@const c = columns[j]}
+      <button class="h" class:num={c.numeric} onclick={() => toggleSort(j)} title={c.type} role="columnheader" aria-colindex={j + 1}>
         <span class="ellipsis">{c.name}</span>
         {#if sort?.col === j}<Icon name={sort.dir > 0 ? 'arrow_upward' : 'arrow_downward'} size={13} />{/if}
       </button>
@@ -151,11 +194,15 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div style="position:absolute;left:0;right:0;top:{start * rowH}px" onclick={onCellClick}>
-        {#each visible as i}
-          <div class="r" class:sel={i === selected} style="grid-template-columns:{template}" role="row" data-i={i}>
+        {#each visible as i (i)}
+          {@const on = i === selected}
+          {@const row = rows[i]}
+          <div class="r" class:sel={on} role="row" data-i={i}>
             {#if gutter}<span class="g" data-j="-1">{i + 1}</span>{/if}
-            {#each rows[i] as v, j}
-              <span class="c" class:num={columns[j].numeric} class:null={v === null} class:cur={i === selected && j === selCol} data-j={j} role="gridcell">{v === null ? 'NULL' : v}</span>
+            <span></span>
+            {#each cols as j (j)}
+              {@const v = row[j]}
+              <span class="c" class:num={columns[j].numeric} class:null={v === null} class:cur={on && j === selCol} data-j={j} role="gridcell">{v === null ? 'NULL' : v}</span>
             {/each}
           </div>
         {/each}
@@ -168,14 +215,14 @@
   .grid { position: relative; overflow: auto; height: 100%; outline: none; font: 400 12.5px var(--sans); contain: strict; }
   .grid.mono { font-family: var(--mono); font-size: 12.5px; }
   .head {
-    position: sticky; top: 0; z-index: 2; display: grid; height: var(--rh); align-items: stretch;
+    position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: var(--tpl); height: var(--rh); align-items: stretch;
     background: var(--panel); border-bottom: 1px solid var(--line); color: var(--faint);
   }
   .h { display: flex; align-items: center; gap: 4px; padding: 0 10px; min-width: 0; color: var(--muted); font: 500 12px var(--sans); }
   :global(:root[data-layout='workspace']) .grid.mono .h { font: 400 12px var(--mono); color: var(--faint); }
   .h:hover { color: var(--text); background: var(--hover); }
   .h.num { justify-content: flex-end; }
-  .r { display: grid; height: var(--rh); align-items: center; border-bottom: 1px solid var(--line); }
+  .r { display: grid; grid-template-columns: var(--tpl); height: var(--rh); align-items: center; border-bottom: 1px solid var(--line); }
   .r:hover { background: var(--panel); }
   .r.sel { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
   .g { text-align: right; padding-right: 12px; color: var(--faint); font: 400 11.5px var(--mono); height: 100%; line-height: var(--rh); }

@@ -95,6 +95,10 @@ Each connection has its own agent policy. Set it in the MCP server view.
 A new connection always starts with the default policy, so it is hidden and
 read-only for agents until you change it.
 
+To set the allowlist, click **All tables** in the row of the connection, then
+click a table to hide it or show it. When a connection has more than 40
+tables, type part of a name to filter the list.
+
 A statement that names a table outside the allowlist is blocked. Rowan does
 not check the tables that a view reads. To protect such data, use grants in
 the database.

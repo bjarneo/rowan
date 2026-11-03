@@ -92,3 +92,53 @@ func TestSourceTable(t *testing.T) {
 		}
 	}
 }
+
+func TestBounded(t *testing.T) {
+	cases := map[string]bool{
+		"SELECT * FROM orders":                                  true,
+		"select 1":                                              true,
+		"WITH x AS (SELECT 1) SELECT * FROM x":                  true,
+		"VALUES (1), (2)":                                       true,
+		"TABLE orders":                                          true,
+		"(SELECT 1) UNION (SELECT 2)":                           true,
+		"SELECT * FROM orders -- the end":                       true,
+		"SELECT 'into' AS word":                                 true,
+		"SELECT * INTO copy FROM orders":                        false,
+		"SELECT * FROM orders FOR UPDATE":                       false,
+		"SELECT * FROM orders FOR NO KEY UPDATE":                false,
+		"SELECT * FROM orders FOR SHARE":                        false,
+		"WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d": false,
+		"EXPLAIN SELECT 1":                                      false,
+		"SHOW search_path":                                      false,
+		"INSERT INTO t VALUES (1) RETURNING id":                 false,
+		"SET default_transaction_read_only = off":               false,
+	}
+	for sql, want := range cases {
+		if got := Bounded(sql, false); got != want {
+			t.Errorf("Bounded(%q) = %v, want %v", sql, got, want)
+		}
+	}
+}
+
+func TestHintAt(t *testing.T) {
+	cases := map[string]string{
+		"SELECT * FROM t":                       "SELECT",
+		"  select a FROM t":                     "  select",
+		"WITH x AS (SELECT 1) SELECT * FROM x":  "WITH x AS (SELECT 1) SELECT",
+		"-- note\nSELECT 1":                     "-- note\nSELECT",
+		"(SELECT 1) UNION (SELECT 2)":           "",
+		"SELECT /*+ MAX_EXECUTION_TIME(5) */ 1": "",
+		"SELECT /* plain */ 1":                  "SELECT",
+		"VALUES ROW(1)":                         "",
+	}
+	for sql, want := range cases {
+		at := HintAt(sql, true)
+		got := ""
+		if at >= 0 {
+			got = sql[:at]
+		}
+		if got != want {
+			t.Errorf("HintAt(%q) cuts at %q, want %q", sql, got, want)
+		}
+	}
+}

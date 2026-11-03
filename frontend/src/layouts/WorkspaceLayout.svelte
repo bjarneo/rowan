@@ -4,7 +4,7 @@
   // feed sit on the right.
   import { app, type Rail } from '../lib/store.svelte'
   import { ENGINE, connColor, fmtK, mmss, MOD } from '../lib/format'
-  import type { Link } from '../lib/types'
+  import type { Link, TableSummary } from '../lib/types'
   import QueryPane from '../components/QueryPane.svelte'
   import RowInspector from '../components/RowInspector.svelte'
   import AgentFeed from '../components/AgentFeed.svelte'
@@ -20,6 +20,60 @@
   const schema = $derived(cn ? app.schemas[cn.id] : undefined)
   const err = $derived(cn ? app.schemaErr[cn.id] : '')
   let filter = $state('')
+
+  // The sidebar is a virtual list: it renders only the rows in view, so a
+  // database with thousands of tables opens and scrolls without delay.
+  // Each item has a fixed height, and tops[i] is the y of item i.
+  type Item = { key: string; kind: 'group' | 'views' | 'table' | 'view'; label: string; t?: TableSummary; first?: boolean }
+  const H = { group: 26, views: 34, table: 26, view: 26 }
+  const GROUP_GAP = 18
+  const sidebar = $derived.by(() => {
+    const f = filter.trim().toLowerCase()
+    const items: Item[] = []
+    const tops: number[] = []
+    let y = 0
+    const push = (it: Item, h: number) => {
+      items.push(it)
+      tops.push(y)
+      y += h
+    }
+    let n = 0
+    for (const g of schema?.groups ?? []) {
+      const match = (t: TableSummary) => !f || t.name.toLowerCase().includes(f)
+      const tabs = g.tables.filter((t) => t.kind === 'table' && match(t))
+      const views = g.tables.filter((t) => t.kind === 'view' && match(t))
+      if (f && !tabs.length && !views.length) continue
+      push({ key: 'g:' + g.name, kind: 'group', label: g.name, first: n === 0 }, H.group + (n ? GROUP_GAP : 0))
+      n++
+      for (const t of tabs) push({ key: 't:' + t.schema + '.' + t.name, kind: 'table', label: t.name, t }, H.table)
+      if (views.length) {
+        push({ key: 'v:' + g.name, kind: 'views', label: 'views' }, H.views)
+        for (const t of views) push({ key: 't:' + t.schema + '.' + t.name, kind: 'view', label: t.name, t }, H.view)
+      }
+    }
+    tops.push(y)
+    return { items, tops, height: y }
+  })
+  const tableCount = $derived(schema?.groups?.reduce((n, g) => n + g.tables.length, 0) ?? 0)
+
+  let listTop = $state(0)
+  let listH = $state(600)
+  /** The first item whose bottom is below y. */
+  function itemAt(y: number) {
+    const tops = sidebar.tops
+    let lo = 0
+    let hi = sidebar.items.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (tops[mid + 1] <= y) lo = mid + 1
+      else hi = mid
+    }
+    return lo
+  }
+  const PAD = 10
+  const first = $derived(Math.max(0, itemAt(listTop - PAD) - 8))
+  const last = $derived(Math.min(sidebar.items.length, itemAt(listTop - PAD + listH) + 8))
+  const shown = $derived(sidebar.items.slice(first, last))
 
   const hidden = (t: string) => {
     const p = cn?.mcp
@@ -98,33 +152,37 @@
         </div>
       {:else}
         <aside class="tables">
-          {#if (schema?.groups?.reduce((n, g) => n + g.tables.length, 0) ?? 0) > 14}
+          {#if tableCount > 14}
             <input class="tfilter" placeholder="filter tables" bind:value={filter} spellcheck="false" />
           {/if}
-          <div class="tl">
+          <div class="tl" bind:clientHeight={listH} onscroll={(e) => (listTop = e.currentTarget.scrollTop)}>
             {#if err}
               <div class="terr danger selectable">{err}</div>
               <button class="tr faint" onclick={() => app.loadSchema(cn.id, true)}>retry</button>
             {:else if !schema}
               <div class="tr faint">loading…</div>
             {:else}
-              {#each schema.groups ?? [] as g}
-                {@const tabs = g.tables.filter((t) => t.kind === 'table' && (!filter || t.name.toLowerCase().includes(filter.toLowerCase())))}
-                {@const views = g.tables.filter((t) => t.kind === 'view' && (!filter || t.name.toLowerCase().includes(filter.toLowerCase())))}
-                <div class="gh grp faint">{g.name}</div>
-                {#each tabs as t (t.name)}
-                  <button class="tr" class:on={srcTable === t.name} class:hid={hidden(t.name)} onclick={() => app.openTable(cn.id, t.schema, t.name)} title={t.name}>
-                    <span class="ellipsis">{t.name}</span>
-                    <span class="faint cnt">{hidden(t.name) ? 'hidden from agents' : (t.estimate ? '~' : '') + fmtK(t.rows)}</span>
-                  </button>
-                {/each}
-                {#if views.length}
-                  <div class="gh faint" style="padding-top:14px">views</div>
-                  {#each views as t (t.name)}
-                    <button class="tr" class:on={srcTable === t.name} onclick={() => app.openTable(cn.id, t.schema, t.name)} title={t.name}><span class="ellipsis muted">{t.name}</span></button>
+              <div class="vl" style="height:{sidebar.height}px">
+                <div class="vw" style="top:{sidebar.tops[first] ?? 0}px">
+                  {#each shown as it (it.key)}
+                    {#if it.kind === 'group'}
+                      <div class="gh faint" class:gap={!it.first}>{it.label}</div>
+                    {:else if it.kind === 'views'}
+                      <div class="gh faint vh">views</div>
+                    {:else if it.kind === 'table' && it.t}
+                      {@const t = it.t}
+                      {@const hid = hidden(t.name)}
+                      <button class="tr" class:on={srcTable === t.name} class:hid onclick={() => app.openTable(cn.id, t.schema, t.name)} title={t.name}>
+                        <span class="ellipsis">{t.name}</span>
+                        <span class="faint cnt">{hid ? 'hidden from agents' : (t.estimate ? '~' : '') + fmtK(t.rows)}</span>
+                      </button>
+                    {:else if it.t}
+                      {@const t = it.t}
+                      <button class="tr" class:on={srcTable === t.name} onclick={() => app.openTable(cn.id, t.schema, t.name)} title={t.name}><span class="ellipsis muted">{t.name}</span></button>
+                    {/if}
                   {/each}
-                {/if}
-              {/each}
+                </div>
+              </div>
             {/if}
           </div>
           <button class="reload faint" onclick={() => app.loadSchema(cn.id, true)}><Icon name="refresh" size={14} />reload</button>
@@ -184,10 +242,13 @@
   .tables { width: 224px; flex: none; border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
   .tfilter { margin: 8px 8px 2px; height: 26px; border: 1px solid var(--line); background: var(--bg); padding: 0 8px; outline: none; font: inherit; }
   .tfilter:focus { border-color: var(--accent); }
-  .tl { flex: 1; overflow: auto; padding: 10px 0; display: flex; flex-direction: column; gap: 1px; }
-  .gh { padding: 0 12px 6px; }
-  .gh.grp ~ .gh.grp { padding-top: 20px; }
-  .tr { display: flex; justify-content: space-between; gap: 8px; padding: 4px 12px; color: var(--muted); text-align: left; min-width: 0; }
+  .tl { flex: 1; overflow: auto; padding: 10px 0; }
+  .vl { position: relative; }
+  .vw { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; }
+  .gh { height: 26px; flex: none; padding: 0 12px; display: flex; align-items: flex-start; line-height: 20px; }
+  .gh.gap { height: 44px; padding-top: 18px; }
+  .gh.vh { height: 34px; padding-top: 8px; }
+  .tr { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 26px; flex: none; padding: 0 12px; color: var(--muted); text-align: left; min-width: 0; }
   .tr > .cnt { flex: none; font-size: 11.5px; }
   .tr:hover { background: var(--hover); color: var(--text); }
   .tr.on { background: var(--hover); color: var(--text); }

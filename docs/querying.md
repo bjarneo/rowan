@@ -77,6 +77,11 @@ to step over the closing parenthesis.
 `Enter` on a word that is already complete adds a new line. `Ctrl+Z` undoes
 an insert.
 
+The editor colors only the lines near the view, so a script of thousands of
+lines types and scrolls at the same speed as a short one. A paste of 4,000
+characters or more goes in at once. `Ctrl+Z` undoes it, and `Ctrl+Shift+Z`
+or `Ctrl+Y` redoes it.
+
 The list does not open inside strings and comments, after `AS`, or for a
 short word after a table name. This keeps an alias such as `o` from turning
 into `ON` when you press `Enter`.
@@ -89,6 +94,22 @@ columns of a table when a statement names it. A write reloads the columns.
 
 The grid shows the first rows up to the limit. The status bar shows the row
 count, the time, and **more available** when the query has more rows.
+
+Rowan sends the limit to the server with the query, so the server stops after
+the limit and plans for that number of rows. A sort over millions of rows
+then uses a top-N sort or an index, and returns in milliseconds instead of
+seconds. You do not have to add `LIMIT` yourself.
+
+- On PostgreSQL, Rowan runs a `SELECT`, `WITH`, `VALUES` or `TABLE`
+  statement as `SELECT * FROM (statement) rowan_q LIMIT n`.
+- On MySQL, Rowan adds the optimizer hint
+  `/*+ SET_VAR(sql_select_limit = n) */` after `SELECT`. A `LIMIT` in your
+  statement takes precedence.
+- Rowan does not change a statement with `INTO` or a locking clause such as
+  `FOR UPDATE`.
+
+The grid renders only the rows and the columns in view. A result with 10,000
+rows or 120 columns scrolls at full frame rate.
 
 - Click a column header to sort the rows that the grid holds.
 - Export the result as CSV, JSON or SQL `INSERT` statements with the buttons
@@ -103,7 +124,9 @@ table, the inspector also follows the keys:
 - A foreign key shows the label of the row that it points to, such as
   `579498 → Maja Fischer`. Click it to open that row.
 - **referenced by** counts the rows in other tables that point to this row.
-  Click a count to open those rows.
+  Click a count to open those rows. When the referencing column has no index,
+  Rowan shows the table without a count, because the count reads the whole
+  table.
 
 The label comes from the first column with a common name, such as `name`,
 `title`, `email` or `number`.

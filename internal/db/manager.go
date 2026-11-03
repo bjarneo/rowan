@@ -23,6 +23,8 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/ssh"
@@ -224,12 +226,15 @@ func (c *Conn) openLocked(ctx context.Context, write bool) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Keep every open connection idle in the pool. The row inspector and the
+	// search preview run several queries at once, and a new connection costs
+	// a TCP, TLS and login round trip, more over SSH.
+	n := 6
 	if write {
-		db.SetMaxOpenConns(2)
-	} else {
-		db.SetMaxOpenConns(6)
+		n = 2
 	}
-	db.SetMaxIdleConns(2)
+	db.SetMaxOpenConns(n)
+	db.SetMaxIdleConns(n)
 	db.SetConnMaxIdleTime(5 * time.Minute)
 	pctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -241,7 +246,8 @@ func (c *Conn) openLocked(ctx context.Context, write bool) (*sql.DB, error) {
 			if err2 == nil {
 				if err2 = db.PingContext(pctx); err2 == nil {
 					db.SetMaxOpenConns(6)
-					db.SetMaxIdleConns(2)
+					db.SetMaxIdleConns(6)
+					db.SetConnMaxIdleTime(5 * time.Minute)
 					return db, nil
 				}
 				db.Close()
@@ -275,6 +281,14 @@ func openPostgres(cfg config.Connection, pw string, write bool, dial func(contex
 	}
 	if !write {
 		pc.RuntimeParams["default_transaction_read_only"] = "on"
+	}
+	// A canceled query sends a cancel request to the server, and the
+	// connection stays open for the next query. The default handler closes
+	// the connection, which costs a new login after each superseded search
+	// preview. When the server does not answer within a second, pgx closes
+	// the connection after all.
+	pc.BuildContextWatcherHandler = func(c *pgconn.PgConn) ctxwatch.Handler {
+		return &pgconn.CancelRequestContextWatcherHandler{Conn: c, DeadlineDelay: time.Second}
 	}
 	if dial != nil {
 		pc.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) { return dial(ctx, network, addr) }
