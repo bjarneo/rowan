@@ -24,7 +24,7 @@ func dialSSH(ctx context.Context, s config.SSH) (*ssh.Client, error) {
 		return nil, errors.New("the SSH tunnel needs a host")
 	}
 	home, _ := os.UserHomeDir()
-	kh, err := knownhosts.New(filepath.Join(home, ".ssh", "known_hosts"))
+	kh, err := loadKnownHosts(filepath.Join(home, ".ssh", "known_hosts"))
 	if err != nil {
 		return nil, fmt.Errorf("can't read ~/.ssh/known_hosts: %w", err)
 	}
