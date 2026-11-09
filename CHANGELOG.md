@@ -7,6 +7,11 @@ Rowan uses [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The row inspector shows JSON objects and arrays indented over lines, from
+  `json` and `jsonb` columns and from text columns that hold JSON.
+
 ### Fixed
 
 - The SSH tunnel skips `~/.ssh/known_hosts` entries with key types it can't

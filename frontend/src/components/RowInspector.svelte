@@ -3,6 +3,7 @@
   import { api } from '../lib/api'
   import { app } from '../lib/store.svelte'
   import { fmtN } from '../lib/format'
+  import { prettyJson } from '../lib/json'
 
   let {
     conn,
@@ -70,9 +71,13 @@
       {#each result.columns as c, j}
         {@const v = row[j]}
         {@const fk = insp?.fks?.[c.name]}
+        {@const json = fk ? null : prettyJson(v, c.type)}
         <div class="f">
           <span class="k ellipsis" title={c.name}>{c.name}</span>
-          {#if fk && v !== null}
+          {#if json}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <pre class="v json" ondblclick={() => copy(v)}>{json}</pre>
+          {:else if fk && v !== null}
             <button class="v link ellipsis" onclick={() => onfollow(fk, v)} title="Open {fk.table}">{v}{fk.label ? ` → ${fk.label}` : ` → ${fk.table}`}</button>
           {:else}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -105,6 +110,7 @@
   .k { color: var(--faint); }
   .v { min-width: 0; }
   .v.null { color: var(--faint); }
+  .json { margin: 0; max-height: 320px; overflow: auto; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); font: 400 12px/1.5 var(--mono); white-space: pre; }
   .link { color: var(--accent-text); text-align: left; }
   .link:hover { text-decoration: underline; }
   .refs { white-space: normal; }
