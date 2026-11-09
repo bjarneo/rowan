@@ -7,6 +7,8 @@ Rowan uses [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-09
+
 ### Added
 
 - The row inspector shows JSON objects and arrays indented over lines, from
